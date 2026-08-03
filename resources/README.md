@@ -1,22 +1,37 @@
 # Resource-cache policy
 
-This directory is reserved for immutable setup inputs and their public manifests.
-It is not an artifact or checkpoint directory.
+This repository directory contains only the public resource policy and
+manifests. Binary resources are stored in an external directory selected with
+`--resource-dir`; they are never committed to this repository.
 
-Future setup releases may cache resources such as:
+Public Toolchain v1.3 defines the `reference-binary-fresh-env` cache contract in
+`config/public_fresh_env_resources_v1.json`.
 
-- pinned source archives or Git bundles;
-- pinned Python wheels;
-- a published quick-validation dataset;
-- manifests containing source URL, expected size, SHA-256, version, and license.
+The external cache contains:
 
-Generated P1 checkpoints do **not** belong here. They are produced locally inside the evidence run, used for fresh-process reload verification, and deleted by default after successful verification. Use `--keep-checkpoints` only for explicit debugging or evidence retention.
+- pinned Nerfstudio source at an exact commit and Git tree;
+- the exact qualified `nerfacc` CPython 3.12 wheel;
+- the exact qualified `tiny-rdna4-nn` runtime directory;
+- the exact six-image quick-validation dataset;
+- a Python wheelhouse for the scoped Nerfacto runtime;
+- `WHEELHOUSE_LOCK.json`, containing size and SHA-256 for every fetched wheel.
 
-The planned setup behavior is fail-closed:
+The three qualified custom resources currently have no public download URL in
+the manifest. They must be supplied through explicit local paths or copied from
+an already prepared cache. `--auto` does not weaken this requirement.
 
-- interactive mode asks before downloading a missing resource;
-- `--auto` may download only entries pinned by the resource manifest;
-- `--offline` forbids network access and lists missing cache entries;
-- every download is written to a temporary `.part` file, hash-verified, and atomically renamed.
+Network behavior is fail-closed:
 
-No download manifest or installer is claimed by Public Toolchain v1.2 yet.
+- interactive mode asks before cloning or downloading a missing public resource;
+- `--auto` permits only manifest-pinned public operations;
+- `--offline` forbids network access;
+- `--verify-resources` performs a non-mutating cache verification;
+- online wheel downloads go to a temporary directory and are moved into place
+  only after the pip download command succeeds;
+- every completed wheelhouse is immediately SHA-256 locked;
+- installation itself reads only from the locked local wheelhouse.
+
+Generated P1 checkpoints do **not** belong in the cache. They are produced
+inside the evidence run, used for fresh-process reload verification, and deleted
+by default after successful verification. Use `--keep-checkpoints` only for
+explicit debugging or evidence retention.

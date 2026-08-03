@@ -164,6 +164,73 @@ class PublicToolchainSelfTests(unittest.TestCase):
             self.assertFalse(producer.exists())
             self.assertFalse(reload.exists())
 
+
+    def test_scoped_nerfacto_config_avoids_global_method_registry(self):
+        forbidden = "from nerfstudio.configs.method_configs import"
+        for rel in [
+            "tools/run_public_a5p0_preflight_v1.py",
+            "tools/run_public_a5p1_nerfacto_smoke_v1.py",
+            "tools/run_public_a5p2_sustained_v1.py",
+            "tools/public_nerfacto_config_v1.py",
+        ]:
+            self.assertNotIn(forbidden, (ROOT / rel).read_text(encoding="utf-8"), msg=rel)
+        builder = (ROOT / "tools/public_nerfacto_config_v1.py").read_text(encoding="utf-8")
+        for anchor in [
+            'method_name="nerfacto"',
+            "steps_per_save=2000",
+            "max_num_iterations=30000",
+            "train_num_rays_per_batch=4096",
+            'CameraOptimizerConfig(mode="SO3xR3")',
+        ]:
+            self.assertIn(anchor, builder)
+
+    def test_fresh_env_manifest_has_no_unqualified_custom_urls(self):
+        manifest = json.loads((ROOT / "config/public_fresh_env_resources_v1.json").read_text(encoding="utf-8"))
+        self.assertEqual("reference-binary-fresh-env", manifest["profile"])
+        for spec in manifest["custom_resources"].values():
+            self.assertIsNone(spec.get("download_url"))
+            self.assertEqual("CACHE_OR_EXPLICIT_LOCAL_PATH", spec.get("availability"))
+        requirements = (ROOT / "requirements/nerfacto_runtime_v1.txt").read_text(encoding="utf-8").lower()
+        self.assertIn("torch==2.13.0+rocm7.2", requirements)
+        self.assertIn("torchvision==0.28.0+rocm7.2", requirements)
+        for excluded in ["gsplat", "open3d", "jupyterlab", "wandb", "comet-ml", "nuscenes-devkit"]:
+            self.assertNotIn(excluded, requirements)
+
+    def test_resource_manager_self_test(self):
+        self.assertTrue(self.run_self_test("manage_public_resources_v1.py")["passed"])
+
+    def test_fresh_env_installer_self_test(self):
+        self.assertTrue(self.run_self_test("setup_public_fresh_env_v1.py")["passed"])
+
+    def test_resource_manager_offline_missing_resources_fails_closed(self):
+        with tempfile.TemporaryDirectory() as td:
+            proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(TOOLS / "manage_public_resources_v1.py"),
+                    "--resource-dir", td,
+                    "--offline",
+                ],
+                cwd=str(ROOT), text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(2, proc.returncode, msg=proc.stdout + "\n" + proc.stderr)
+            self.assertIn("OFFLINE_MISSING_NERFSTUDIO_SOURCE", proc.stdout)
+            self.assertIn("MISSING_CUSTOM_RESOURCE_NERFACC_WHEEL", proc.stdout)
+
+    def test_fresh_native_profile_is_rejected(self):
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(TOOLS / "setup_public_fresh_env_v1.py"),
+                "--profile", "fresh-native-build",
+                "--resource-dir", "/tmp/not-used",
+                "--download-only",
+            ],
+            cwd=str(ROOT), text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(64, proc.returncode)
+        self.assertIn("fresh-native-build is not claimed", proc.stderr)
+
     def test_p2_wrapper_requires_maintainer_confirmation(self):
         proc = subprocess.run(
             ["bash", str(ROOT / "scripts/run_public_a5p2_sustained_v1.sh")],

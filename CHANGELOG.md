@@ -9,6 +9,11 @@
 
 ### Added
 
+- Public Toolchain v1.3 `reference-binary-fresh-env` installer with interactive, `--auto`, `--offline`, `--download-only`, and non-mutating `--verify-resources` modes;
+- external resource manifest and exact SHA-256 verification for the qualified `nerfacc` wheel, `tiny-rdna4-nn` runtime, and quick-validation dataset;
+- first-fetch Python wheelhouse locking followed by network-free installation from the local cache;
+- scoped Nerfacto configuration construction that avoids eager imports of unrelated Nerfstudio models and their dependency stacks;
+- fresh-environment pip provenance, activation policy, and automatic P0+P1 quick validation;
 - Public Toolchain v1.2 one-command P0+P1 quick validation;
 - default hash-verified deletion of the two locally generated P1 checkpoints, plus `--keep-checkpoints`;
 - explicit P2 maintainer confirmation in both the shell and Python entry points;
@@ -27,7 +32,7 @@
 
 ### Not yet included
 
-- one-command dependency installer;
+- qualified fresh native builds of `nerfacc` and `tiny-rdna4-nn`;
+- successful real GPU execution of the v1.3 fresh-environment installer;
 - sanitized full public evidence bundle from an independent host;
-- neutral fresh-clone GPU validation of Public Toolchain v1;
 - VMM performance benchmark.

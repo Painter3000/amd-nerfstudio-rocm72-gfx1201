@@ -1,0 +1,34 @@
+# Scoped runtime seed for the public Nerfacto P0+P1 path.
+# The first successful online fetch is frozen into WHEELHOUSE_LOCK.json.
+torch==2.13.0+rocm7.2
+torchvision==0.28.0+rocm7.2
+appdirs>=1.4
+cryptography>=38
+tyro>=0.9.8
+ninja>=1.10
+imageio>=2.21.1
+jaxtyping>=0.2.15
+matplotlib>=3.6.0
+mediapy>=1.1.0
+msgpack>=1.0.4
+msgpack-numpy>=0.4.8
+opencv-python-headless==4.10.0.84
+Pillow>=10.3.0
+plotly>=5.7.0
+protobuf<=5,!=3.20.0
+pyquaternion>=0.9.9
+requests
+rich>=12.5.1
+scikit-image>=0.19.3
+splines==0.3.0
+tensorboard>=2.13.0
+torchmetrics[image]==1.9.0
+lightning-utilities==0.15.3
+typing-extensions>=4.4.0
+viser==1.0.0
+trimesh>=3.20.2
+pytorch-msssim
+packaging
+fpsample
+pybind11
+tensorly

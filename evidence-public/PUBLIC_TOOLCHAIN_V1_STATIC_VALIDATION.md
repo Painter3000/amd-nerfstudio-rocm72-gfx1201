@@ -10,7 +10,7 @@
 ```text
 PUBLIC_TOOLCHAIN_V1_PYTHON_COMPILE: PASS
 PUBLIC_TOOLCHAIN_V1_SHELL_PARSE: PASS
-PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (10/10)
+PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (16/16)
 PUBLIC_TOOLCHAIN_V1_P0_FAIL_CLOSED_FIXTURE: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_FREEZE_FIXTURE: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_TREE_AUDIT: PASS
@@ -70,4 +70,30 @@ P2_CONFIRMATION_GUARD: PASS
 
 The static fixture creates synthetic producer and reload checkpoint files, records their size and SHA-256, applies the default retention policy, and verifies that both files are removed only after exact verification.
 
-The neutral-directory GPU replay of the reference runtime is documented separately in `PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md`. A new environment built only from public setup resources remains unqualified.
+The neutral-directory GPU replay of the reference runtime is documented separately in `PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md`. The v1.3 installer candidate is now present, but a real environment created by it remains unqualified until the fresh GPU run passes.
+
+## Public Toolchain v1.3 fresh-environment candidate
+
+```text
+PUBLIC_FRESH_ENV_RESOURCE_MANAGER_SELF_TEST: PASS
+PUBLIC_FRESH_ENV_INSTALLER_SELF_TEST: PASS
+SCOPED_NERFACTO_CONFIG_POLICY: PASS
+OFFLINE_MISSING_RESOURCE_FAIL_CLOSED: PASS
+FRESH_NATIVE_PROFILE_REJECTION: PASS
+WHEELHOUSE_HASH_MUTATION_REJECTION: PASS
+PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (16/16)
+PUBLIC_FRESH_ENV_GPU_EXECUTION: NOT_RUN
+```
+
+The v1.3 static fixtures verify exact custom-resource anchors, non-mutating cache
+verification, wheelhouse SHA-256 locking, modified-wheel rejection, activation
+policy generation, offline failure behavior, and rejection of the unqualified
+`fresh-native-build` profile.
+
+P0, P1, and P2 now construct only the pinned Nerfacto configuration through the
+scoped public builder. The static policy rejects a return to Nerfstudio's global
+method registry, which eagerly imports unrelated model stacks.
+
+This static result does not yet qualify a real environment created by the new
+installer. The next gate is an online cache preparation followed by a clean
+Python 3.12 environment creation and the real R9700 P0+P1 quick validation.

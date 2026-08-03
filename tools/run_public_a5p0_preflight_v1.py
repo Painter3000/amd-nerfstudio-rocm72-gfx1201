@@ -28,8 +28,8 @@ SCHEMA = "amd-nerfstudio-public-a5p0-preflight-v1"
 CLASSIFICATION = "PUBLIC_A5_P0_RUNTIME_SOURCE_DATASET_PREFLIGHT_V1"
 
 CORE_MODULES = [
+    "public_nerfacto_config_v1",
     "nerfstudio",
-    "nerfstudio.configs.method_configs",
     "nerfstudio.engine.trainer",
     "nerfstudio.pipelines.base_pipeline",
     "nerfstudio.data.datamanagers.parallel_datamanager",
@@ -85,8 +85,8 @@ try:
             out["modules"].append({"module": name, "passed": True, "file": str(pathlib.Path(mod.__file__).resolve()) if getattr(mod, "__file__", None) else None})
         except Exception as exc:
             out["modules"].append({"module": name, "passed": False, "error": repr(exc), "traceback": traceback.format_exc()})
-    from nerfstudio.configs.method_configs import all_methods
-    cfg = all_methods["nerfacto"]
+    from public_nerfacto_config_v1 import build_public_nerfacto_config
+    cfg = build_public_nerfacto_config()
     dm = cfg.pipeline.datamanager
     origins = {}
     for name, mod in sorted(sys.modules.items()):
@@ -114,6 +114,7 @@ except Exception as exc:
 print("PUBLIC_A5P0_JSON=" + json.dumps(out, sort_keys=True))
 '''
     env = build_runtime_env(runtime, nerfstudio)
+    env["PYTHONPATH"] = os.pathsep.join([str(Path(__file__).resolve().parent), env["PYTHONPATH"]])
     result = run_command([str(python), "-c", code, json.dumps(CORE_MODULES)], cwd=Path("/tmp"), env=env, timeout=300)
     payload = None
     for line in reversed(result.get("stdout", "").splitlines()):

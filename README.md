@@ -135,6 +135,7 @@ Not claimed:
 - [Public Toolchain v1 static validation](evidence-public/PUBLIC_TOOLCHAIN_V1_STATIC_VALIDATION.md)
 - [Public Toolchain v1 tool hashes](evidence-public/PUBLIC_TOOLCHAIN_V1_TOOL_SHA256SUMS.txt)
 - [Public quick-validation reference replay](evidence-public/PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md)
+- [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md)
 - [Resource-cache policy](resources/README.md)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
@@ -166,9 +167,30 @@ This executes only P0 and the two-step P1 producer/reload smoke. Temporary check
 
 P2 is never started by the quick wrapper. The P2 entry point requires an explicit `--maintainer-confirm` acknowledgement.
 
+### Public Toolchain v1.3 fresh environment
+
+Public Toolchain v1.3 adds the `reference-binary-fresh-env` installer:
+
+```bash
+scripts/setup_public_fresh_env_v1.sh \
+  --resource-dir "$PWD/resource-cache-v1" \
+  --install-root "$PWD/fresh-env-v1" \
+  --nerfacc-wheel /path/to/qualified-nerfacc.whl \
+  --tcnn-runtime /path/to/qualified-tiny-rdna4-nn-runtime \
+  --dataset /path/to/qualified-quick-dataset
+```
+
+The default mode asks before public network access. `--auto` approves only pinned public operations; `--offline` forbids network access; `--download-only` prepares the cache; and `--verify-resources` performs non-mutating verification.
+
+The installer creates a new Python 3.12 virtual environment, downloads a scoped wheelhouse from PyPI plus the official PyTorch ROCm 7.2 index, writes a SHA-256 lock for every fetched wheel, installs only from that local wheelhouse, copies the exact qualified custom runtime inputs, records pip provenance, and runs the normal-user P0+P1 quick validation.
+
+The three custom resources currently have no download URL in the manifest. They must be supplied from an explicit local path or an existing verified cache. A fresh native rebuild is not claimed and is rejected fail-closed.
+
+See [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md).
+
 ### Publication state
 
-Public Toolchain v1.2 preserves explicit virtual-environment Python launchers and has passed static self-tests and repository-tree audit. A neutral-directory P0+P1 reference-runtime replay has also passed. A new environment built solely from public setup resources remains a separate future qualification step.
+Public Toolchain v1.3 has passed static self-tests and repository-tree audit as an installer candidate. The v1.2 neutral-directory P0+P1 reference-runtime replay has passed. A real fresh-environment GPU execution of v1.3 remains the next qualification gate and is not claimed until that run succeeds.
 
 ## Related projects
 

@@ -1,0 +1,77 @@
+{
+  "schema": "amd-nerfstudio-public-fresh-env-resources-v1",
+  "profile": "reference-binary-fresh-env",
+  "scope": "NERFACTO_TRAINING_CHAIN_NOT_FULL_NERFSTUDIO",
+  "target": {
+    "architecture": "gfx1201",
+    "hip": "7.2.53211",
+    "operating_system": "Ubuntu 24.04",
+    "python_major_minor": "3.12",
+    "torch": "2.13.0+rocm7.2",
+    "torchvision": "0.28.0+rocm7.2"
+  },
+  "network_policy": {
+    "default": "PROMPT_BEFORE_NETWORK",
+    "auto": "PINNED_RESOURCES_ONLY",
+    "offline": "NETWORK_FORBIDDEN",
+    "first_fetch_integrity": "PINNED_INDEX_AND_VERSION_THEN_LOCAL_SHA256_LOCK"
+  },
+  "public_python_index": {
+    "primary": "https://pypi.org/simple",
+    "pytorch_rocm": "https://download.pytorch.org/whl/rocm7.2"
+  },
+  "nerfstudio_source": {
+    "url": "https://github.com/nerfstudio-project/nerfstudio.git",
+    "commit": "50e0e3c70c775e89333256213363badbf074f29d",
+    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e",
+    "mlp_relative_path": "nerfstudio/field_components/mlp.py",
+    "mlp_sha256": "4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad"
+  },
+  "custom_resources": {
+    "nerfacc_wheel": {
+      "cache_relative_path": "wheels/custom/nerfacc-0.5.2-cp312-cp312-linux_x86_64.whl",
+      "sha256": "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00",
+      "installed_native_relative_path": "nerfacc/csrc.so",
+      "installed_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
+      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
+      "download_url": null
+    },
+    "tiny_rdna4_runtime": {
+      "cache_relative_path": "runtime/tiny-rdna4-nn",
+      "modules_relative_path": "tinycudann/modules.py",
+      "modules_sha256": "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
+      "native_glob": "tinycudann_bindings/_120_C*.so",
+      "native_sha256": "883f89efdad7bb909a4a3899ab79b2defe9713fdb5c7cf22cf4882c626b3efc4",
+      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
+      "download_url": null
+    },
+    "quick_validation_dataset": {
+      "cache_relative_path": "datasets/quick-validation",
+      "transforms_sha256": "af9521e1e841c5e4b5665836a525e01758740be138fcf2fa7fbdb6e6bf2c4f81",
+      "path_size_manifest_sha256": "556323e293c813841ad09d1b8accd9523201784e134a1be52628f4fc70e7bfbe",
+      "images": {
+        "000.png": "e46d81d50f465fc315e0a5941fcef213eabc65f9b5801f0e25295b77aa7101ba",
+        "001.png": "16b5deb940f566d23cb6b056c51bf416a927322fadae65b714e32047ef685a2c",
+        "002.png": "ae95b001c5266345513dc126b3846053a4e59c4fc682ed3ec167ed286947f032",
+        "003.png": "4d7a2e4a7cbb4ffa5ca1e9a1a73f00f0cee2c8723beed40c7ff2f49e28a4de7d",
+        "004.png": "9685e77a01ab1532b53c2dddc640270c57514a984a49cd38f81ad4ac3b84434c",
+        "005.png": "32f82b9b4ea2de3ed82b4e1358661deb5d7d0dac177f9a9aac51e359c19286b4"
+      },
+      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
+      "download_url": null
+    }
+  },
+  "cache_layout": {
+    "wheelhouse": "wheelhouse/py312-rocm72",
+    "wheelhouse_lock": "locks/WHEELHOUSE_LOCK.json",
+    "nerfstudio_source": "sources/nerfstudio"
+  },
+  "nonclaims": [
+    "FRESH_NATIVE_NERFACC_BUILD",
+    "FRESH_NATIVE_TINY_RDNA4_NN_BUILD",
+    "FULL_NERFSTUDIO_DEPENDENCY_SET",
+    "FULL_NERFSTUDIO_FEATURE_COVERAGE",
+    "CROSS_TIME_PYPI_RESOLUTION_IDENTITY_BEFORE_A_PUBLISHED_WHEELHOUSE_LOCK",
+    "VMM_FALLBACK_PERFORMANCE_PARITY"
+  ]
+}

@@ -470,8 +470,8 @@ def install_single_sh_guard() -> None:
 
 
 def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, rays: int, end_step: int, checkpoint: Path | None) -> tuple[Any, dict[str, Any]]:
-    from nerfstudio.configs.method_configs import all_methods
-    cfg = copy.deepcopy(all_methods["nerfacto"])
+    from public_nerfacto_config_v1 import build_public_nerfacto_config
+    cfg = copy.deepcopy(build_public_nerfacto_config())
     cfg.data = data
     cfg.output_dir = output_dir
     cfg.experiment_name = run_name
