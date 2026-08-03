@@ -134,15 +134,19 @@ Not claimed:
 - [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md)
 - [Public Toolchain v1 static validation](evidence-public/PUBLIC_TOOLCHAIN_V1_STATIC_VALIDATION.md)
 - [Public Toolchain v1 tool hashes](evidence-public/PUBLIC_TOOLCHAIN_V1_TOOL_SHA256SUMS.txt)
+- [Public quick-validation reference replay](evidence-public/PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md)
+- [Resource-cache policy](resources/README.md)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
-## Public Toolchain v1.1
+## Public Toolchain v1.2
 
-The repository now includes Public Toolchain v1.1, the path-independent public requalification toolchain:
+The repository now includes Public Toolchain v1.2, with a short normal-user validation path and a separately guarded maintainer qualification path:
 
 - fail-closed P0 source/runtime/dataset preflight;
 - real P1 Nerfacto DataManager, forward, backward, optimizer, checkpoint, exact fresh-process reload, and resumed step;
-- sustained P2 A/C/B split-resume qualification using the original 576-step design;
+- one-command P0+P1 quick validation that never launches P2;
+- verified deletion of temporary P1 checkpoints by default, with `--keep-checkpoints` as an explicit opt-in;
+- sustained P2 A/C/B split-resume qualification using the original 576-step design, guarded as maintainer-only;
 - a separate public requalification freeze;
 - a public-tree audit that rejects host-specific paths, secrets, nested Git trees, archives, checkpoints, and native binaries.
 
@@ -150,9 +154,21 @@ The public runners do **not** rewrite or supersede the canonical private A5 free
 
 See [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md).
 
+### Normal user validation
+
+After setting the five explicit `NERFSTUDIO_RDNA4_PUBLIC_*` path variables described in the toolchain documentation:
+
+```bash
+scripts/run_public_quick_validation_v1.sh
+```
+
+This executes only P0 and the two-step P1 producer/reload smoke. Temporary checkpoints are hash-verified and removed after a successful run. Use `--keep-checkpoints` only when the files are needed for debugging or evidence retention.
+
+P2 is never started by the quick wrapper. The P2 entry point requires an explicit `--maintainer-confirm` acknowledgement.
+
 ### Publication state
 
-Public Toolchain v1.1 preserves explicit virtual-environment Python launchers and has passed static self-tests and repository-tree audit. A neutral fresh-clone GPU execution remains a separate qualification step and is not claimed by this commit.
+Public Toolchain v1.2 preserves explicit virtual-environment Python launchers and has passed static self-tests and repository-tree audit. A neutral-directory P0+P1 reference-runtime replay has also passed. A new environment built solely from public setup resources remains a separate future qualification step.
 
 ## Related projects
 

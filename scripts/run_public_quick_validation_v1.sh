@@ -1,36 +1,18 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-if [[ "${1:-}" != "--maintainer-confirm" ]]; then
-  cat >&2 <<'EOF'
-PUBLIC_A5_P2_NOT_STARTED
-
-P2 is an extended maintainer qualification, not a normal user test.
-It runs the 576-step A/C/B split-resume design and can take roughly 85–95 minutes
-on the reference R9700 system.
-
-To run it deliberately, place --maintainer-confirm as the first argument.
-Normal users should run scripts/run_public_quick_validation_v1.sh instead.
-EOF
-  exit 64
-fi
-shift
-
 : "${NERFSTUDIO_RDNA4_PUBLIC_PYTHON:?set NERFSTUDIO_RDNA4_PUBLIC_PYTHON}"
 : "${NERFSTUDIO_RDNA4_PUBLIC_NERFSTUDIO_WORKTREE:?set NERFSTUDIO_RDNA4_PUBLIC_NERFSTUDIO_WORKTREE}"
 : "${NERFSTUDIO_RDNA4_PUBLIC_TCNN_RUNTIME:?set NERFSTUDIO_RDNA4_PUBLIC_TCNN_RUNTIME}"
 : "${NERFSTUDIO_RDNA4_PUBLIC_DATASET:?set NERFSTUDIO_RDNA4_PUBLIC_DATASET}"
 : "${NERFSTUDIO_RDNA4_PUBLIC_OUTPUT_ROOT:?set NERFSTUDIO_RDNA4_PUBLIC_OUTPUT_ROOT}"
-: "${NERFSTUDIO_RDNA4_PUBLIC_P1_RUN_DIR:?set NERFSTUDIO_RDNA4_PUBLIC_P1_RUN_DIR}"
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 exec "$NERFSTUDIO_RDNA4_PUBLIC_PYTHON" \
-  "$REPO_ROOT/tools/run_public_a5p2_sustained_v1.py" \
-  --maintainer-confirm \
+  "$REPO_ROOT/tools/run_public_quick_validation_v1.py" \
   --python "$NERFSTUDIO_RDNA4_PUBLIC_PYTHON" \
   --nerfstudio-worktree "$NERFSTUDIO_RDNA4_PUBLIC_NERFSTUDIO_WORKTREE" \
   --tcnn-runtime "$NERFSTUDIO_RDNA4_PUBLIC_TCNN_RUNTIME" \
   --data "$NERFSTUDIO_RDNA4_PUBLIC_DATASET" \
   --output-root "$NERFSTUDIO_RDNA4_PUBLIC_OUTPUT_ROOT" \
-  --p1-run-dir "$NERFSTUDIO_RDNA4_PUBLIC_P1_RUN_DIR" \
   "$@"

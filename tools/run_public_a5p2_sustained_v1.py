@@ -1338,9 +1338,17 @@ def main() -> int:
     parser.add_argument("--child-output", type=Path)
     parser.add_argument("--run-id")
     parser.add_argument("--timeout", type=int, default=7200)
+    parser.add_argument("--maintainer-confirm", action="store_true", help="explicitly confirm the extended 576-step maintainer qualification")
     args = parser.parse_args()
     if args.mode == "self-test":
         return self_test()
+    if args.mode == "orchestrate" and not args.maintainer_confirm:
+        print(
+            "PUBLIC_A5_P2_NOT_STARTED: extended 576-step qualification requires --maintainer-confirm; "
+            "normal users should run scripts/run_public_quick_validation_v1.sh",
+            file=sys.stderr,
+        )
+        return 64
     if args.data is None or args.python is None:
         parser.error("run modes require --data and --python")
     if args.steps < 64 or args.split_step <= 0 or args.split_step >= args.steps:

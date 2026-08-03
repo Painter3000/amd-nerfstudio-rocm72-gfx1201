@@ -47,3 +47,9 @@ Public Toolchain v1.1 keeps the Python launcher absolute while preserving its fi
 ## General rule
 
 A fail-closed gate can expose a defect in the adapter or orchestrator rather than in the object being tested. The blocked run must remain intact, the measurement bug must be versioned, and the corrected attempt must run as a new evidence generation.
+
+## Public P1 checkpoint classification clarification
+
+The two approximately 176 MB files produced by the public P1 replay were initially discussed as possible external resources. Inspection of their run paths and P1 reports confirmed that they were created locally by the producer and fresh reload processes at steps 0 and 1. They are not official Nerfstudio downloads or pretrained model assets.
+
+Public Toolchain v1.2 therefore verifies and deletes both successful smoke-test checkpoints by default. Failed runs retain available checkpoints for recovery, and `--keep-checkpoints` is the explicit opt-in for successful runs.

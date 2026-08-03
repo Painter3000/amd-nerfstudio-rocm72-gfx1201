@@ -10,7 +10,7 @@
 ```text
 PUBLIC_TOOLCHAIN_V1_PYTHON_COMPILE: PASS
 PUBLIC_TOOLCHAIN_V1_SHELL_PARSE: PASS
-PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (7/7)
+PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (10/10)
 PUBLIC_TOOLCHAIN_V1_P0_FAIL_CLOSED_FIXTURE: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_FREEZE_FIXTURE: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_TREE_AUDIT: PASS
@@ -24,6 +24,9 @@ PUBLIC_TOOLCHAIN_V1_FRESH_CLONE_GPU_QUALIFICATION: NOT_RUN
 - no home-directory discovery or project-specific local default path remains;
 - P0 blocks on incomplete source/runtime/dataset fixtures;
 - P1 and P2 numeric/helper self-tests pass;
+- the normal-user quick wrapper self-test proves that P2 is never launched;
+- successful P1 checkpoint files are deleted only after recorded size and SHA-256 verification;
+- P2 shell and Python entry points require explicit maintainer confirmation;
 - the public freeze verifies P0/P1/P2 manifests and native decision semantics;
 - P0's dataset-object representation and P1/P2's dataset-string representation resolve to the same canonical path;
 - the optional freeze archive does not mutate files already covered by its manifest;
@@ -54,3 +57,17 @@ P0_P1_P2_PYTHON_PATH_POLICY: ABSOLUTE_WITH_FINAL_SYMLINK_PRESERVED
 ```
 
 The regression fixture supplies a synthetic `venv/bin/python` symlink and verifies that the public runner retains the launcher path instead of resolving it to the system interpreter.
+
+## Public Toolchain v1.2 quick-user policy
+
+```text
+PUBLIC_QUICK_VALIDATION_SELF_TEST: PASS
+P1_DEFAULT_CHECKPOINT_POLICY: DELETE_AFTER_VERIFICATION
+P1_FAILURE_CHECKPOINT_POLICY: RETAIN_ON_FAILURE
+P2_POLICY: MAINTAINER_ONLY
+P2_CONFIRMATION_GUARD: PASS
+```
+
+The static fixture creates synthetic producer and reload checkpoint files, records their size and SHA-256, applies the default retention policy, and verifies that both files are removed only after exact verification.
+
+The neutral-directory GPU replay of the reference runtime is documented separately in `PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md`. A new environment built only from public setup resources remains unqualified.

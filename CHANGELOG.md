@@ -9,6 +9,10 @@
 
 ### Added
 
+- Public Toolchain v1.2 one-command P0+P1 quick validation;
+- default hash-verified deletion of the two locally generated P1 checkpoints, plus `--keep-checkpoints`;
+- explicit P2 maintainer confirmation in both the shell and Python entry points;
+- sanitized reference-runtime replay summary and resource-cache policy;
 - Public Toolchain v1 with path-independent P0/P1/P2 requalification runners;
 - explicit `gfx1201` / ROCm 7.2 reference manifest;
 - fail-closed public-tree audit and public requalification freeze;

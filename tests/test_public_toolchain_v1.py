@@ -11,6 +11,9 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 TOOLS = ROOT / "tools"
+sys.path.insert(0, str(TOOLS))
+
+import run_public_a5p1_nerfacto_smoke_v1 as p1_tool
 
 
 class PublicToolchainSelfTests(unittest.TestCase):
@@ -30,6 +33,9 @@ class PublicToolchainSelfTests(unittest.TestCase):
 
     def test_p2_self_test(self):
         self.assertTrue(self.run_self_test("run_public_a5p2_sustained_v1.py")["passed"])
+
+    def test_quick_validation_self_test(self):
+        self.assertTrue(self.run_self_test("run_public_quick_validation_v1.py")["passed"])
 
     def test_freeze_self_test(self):
         self.assertTrue(self.run_self_test("run_public_a5_freeze_v1.py")["passed"])
@@ -127,6 +133,45 @@ class PublicToolchainSelfTests(unittest.TestCase):
             self.assertTrue(report["passed"])
             self.assertEqual("PUBLIC_A5_FROZEN", report["decision"])
             self.assertFalse(report["private_canonical_a5_freeze_modified"])
+
+    def test_successful_p1_deletes_verified_checkpoints_by_default(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            producer = root / "producer.ckpt"
+            reload = root / "reload.ckpt"
+            producer.write_bytes(b"producer-checkpoint")
+            reload.write_bytes(b"reload-checkpoint")
+            report = {
+                "checks": {"A5_P1_REAL_MECHANICS": True},
+                "producer": {
+                    "checkpoint": {
+                        "path": str(producer),
+                        "size_bytes": producer.stat().st_size,
+                        "sha256": hashlib.sha256(producer.read_bytes()).hexdigest(),
+                    }
+                },
+                "reload": {
+                    "checkpoint": {
+                        "path": str(reload),
+                        "size_bytes": reload.stat().st_size,
+                        "sha256": hashlib.sha256(reload.read_bytes()).hexdigest(),
+                    }
+                },
+            }
+            retention = p1_tool.apply_checkpoint_retention(report, keep_checkpoints=False)
+            self.assertTrue(retention["passed"])
+            self.assertEqual("DELETE_AFTER_VERIFICATION", retention["policy"])
+            self.assertFalse(producer.exists())
+            self.assertFalse(reload.exists())
+
+    def test_p2_wrapper_requires_maintainer_confirmation(self):
+        proc = subprocess.run(
+            ["bash", str(ROOT / "scripts/run_public_a5p2_sustained_v1.sh")],
+            cwd=str(ROOT), text=True, capture_output=True, check=False,
+        )
+        self.assertEqual(64, proc.returncode)
+        self.assertIn("PUBLIC_A5_P2_NOT_STARTED", proc.stderr)
+        self.assertIn("run_public_quick_validation_v1.sh", proc.stderr)
 
 
 if __name__ == "__main__":

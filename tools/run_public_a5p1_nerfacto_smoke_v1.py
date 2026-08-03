@@ -827,6 +827,7 @@ def create_gate(report: dict[str, Any]) -> str:
         "FRESH_PROCESS_CHECKPOINT_EXACT_RELOAD",
         "FRESH_PROCESS_RESUME_STEP",
         "TINY_RDNA4_NN_SINGLE_SH_AND_NO_MIXED_ORIGINS",
+        "CHECKPOINT_RETENTION_POLICY",
         "A5_P1_REAL_MECHANICS",
     ]
     lines = [
@@ -840,6 +841,7 @@ def create_gate(report: dict[str, Any]) -> str:
         "training_scope=PRODUCER_STEP_0_PLUS_FRESH_RESUME_STEP_1",
         "long_run_training_stability=NOT_CLAIMED",
         "full_shared_venv_global_consistency=NOT_CLAIMED",
+        f"checkpoint_policy={report.get('checkpoint_retention', {}).get('policy', 'UNKNOWN')}",
         "",
     ]
     for name in ordered:
@@ -852,6 +854,88 @@ def create_gate(report: dict[str, Any]) -> str:
         "PUBLIC_RDNA4_A5_P1_PROCEED_TO_P2: PASS" if report.get("passed") else "PUBLIC_RDNA4_A5_P1_PROCEED_TO_P2: BLOCKED",
     ])
     return "\n".join(lines) + "\n"
+
+
+def apply_checkpoint_retention(report: dict[str, Any], *, keep_checkpoints: bool) -> dict[str, Any]:
+    """Verify and either retain or delete the two temporary P1 checkpoints.
+
+    Failed P1 runs always retain any checkpoint that exists so recovery evidence
+    is not destroyed. Successful runs delete verified checkpoints by default;
+    ``--keep-checkpoints`` retains them explicitly.
+    """
+    core_passed = bool(report.get("checks", {}).get("A5_P1_REAL_MECHANICS"))
+    requested_policy = "KEEP" if keep_checkpoints else "DELETE_AFTER_VERIFICATION"
+    effective_policy = requested_policy if core_passed else "RETAIN_ON_FAILURE"
+    rows: list[dict[str, Any]] = []
+    passed = True
+
+    for role in ("producer", "reload"):
+        checkpoint = report.get(role, {}).get("checkpoint", {})
+        raw_path = checkpoint.get("path")
+        expected_sha = checkpoint.get("sha256")
+        expected_size = checkpoint.get("size_bytes")
+        row: dict[str, Any] = {
+            "role": role,
+            "path": raw_path,
+            "expected_sha256": expected_sha,
+            "expected_size_bytes": expected_size,
+            "action": "NOT_PRESENT",
+            "passed": False,
+        }
+        if not raw_path:
+            row["error"] = "CHECKPOINT_PATH_MISSING_FROM_REPORT"
+            rows.append(row)
+            passed = False
+            continue
+
+        path = Path(raw_path)
+        if not path.is_file():
+            row["error"] = "CHECKPOINT_FILE_MISSING"
+            rows.append(row)
+            passed = False
+            continue
+
+        observed_sha = sha256(path)
+        observed_size = path.stat().st_size
+        row.update({
+            "observed_sha256": observed_sha,
+            "observed_size_bytes": observed_size,
+            "hash_matches": observed_sha == expected_sha,
+            "size_matches": observed_size == expected_size,
+        })
+        if not row["hash_matches"] or not row["size_matches"]:
+            row["action"] = "RETAINED_MISMATCH"
+            row["error"] = "CHECKPOINT_VERIFICATION_FAILED"
+            rows.append(row)
+            passed = False
+            continue
+
+        if effective_policy == "DELETE_AFTER_VERIFICATION":
+            try:
+                path.chmod(0o600)
+                path.unlink()
+                row["action"] = "DELETED_AFTER_VERIFICATION"
+                row["deleted"] = not path.exists()
+                row["passed"] = bool(row["deleted"])
+            except OSError as exc:
+                row["action"] = "DELETE_FAILED"
+                row["error"] = repr(exc)
+                row["passed"] = False
+        else:
+            row["action"] = "RETAINED"
+            row["retained"] = path.is_file()
+            row["passed"] = bool(row["retained"])
+
+        rows.append(row)
+        passed = passed and bool(row["passed"])
+
+    return {
+        "requested_policy": requested_policy,
+        "policy": effective_policy,
+        "core_mechanics_passed": core_passed,
+        "files": rows,
+        "passed": passed,
+    }
 
 
 def chmod_tree_readonly(root: Path) -> None:
@@ -979,6 +1063,12 @@ def orchestrate(args: argparse.Namespace) -> int:
         "TINY_RDNA4_NN_SINGLE_SH_AND_NO_MIXED_ORIGINS": origins_ok,
     }
     checks["A5_P1_REAL_MECHANICS"] = all(checks.values())
+    report["checks"] = checks
+    report["checkpoint_retention"] = apply_checkpoint_retention(report, keep_checkpoints=args.keep_checkpoints)
+    checks["CHECKPOINT_RETENTION_POLICY"] = bool(report["checkpoint_retention"]["passed"])
+    checks["A5_P1_REAL_MECHANICS"] = all(
+        passed for name, passed in checks.items() if name != "A5_P1_REAL_MECHANICS"
+    )
     blockers = [name for name, passed in checks.items() if not passed and name != "A5_P1_REAL_MECHANICS"]
     report.update({"checks": checks, "blockers": blockers, "passed": checks["A5_P1_REAL_MECHANICS"], "decision": "PROCEED_TO_PUBLIC_A5_P2" if checks["A5_P1_REAL_MECHANICS"] else "PUBLIC_A5_P1_BLOCKED"})
     report["process_identity"] = {"orchestrator_pid": os.getpid(), "producer_pid": producer_pid, "reload_pid": reload_pid, "producer_and_reload_distinct": bool(producer_pid and reload_pid and producer_pid != reload_pid)}
@@ -1028,6 +1118,7 @@ def main() -> int:
     parser.add_argument("--checkpoint", type=Path)
     parser.add_argument("--child-output", type=Path)
     parser.add_argument("--timeout", type=int, default=1800)
+    parser.add_argument("--keep-checkpoints", action="store_true", help="retain temporary producer and reload checkpoints after successful verification")
     args = parser.parse_args()
     if args.mode == "self-test":
         return self_test()

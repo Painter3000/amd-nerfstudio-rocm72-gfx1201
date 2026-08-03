@@ -36,7 +36,9 @@
 
 - run from a neutral working directory;
 - verify loaded module paths and hashes;
-- execute the public P0/P1 path;
+- execute the public P0/P1 quick path;
+- delete successfully verified temporary checkpoints by default;
+- require explicit maintainer acknowledgement for the extended P2 path;
 - use a bounded public sustained test rather than silently reproducing the private qualification claim;
 - keep performance explicitly separate.
 
@@ -57,7 +59,8 @@ Implemented in the repository after the documentation bootstrap:
 ```text
 PUBLIC_TOOLCHAIN_V1_STATIC_SELF_TESTS: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_TREE_AUDIT: PASS
-PUBLIC_TOOLCHAIN_V1_FRESH_CLONE_GPU_RUN: NOT_YET_CLAIMED
+PUBLIC_TOOLCHAIN_V1_REFERENCE_RUNTIME_P0_P1_REPLAY: PASS
+PUBLIC_TOOLCHAIN_V1_FRESH_ENV_BUILD: NOT_YET_CLAIMED
 ```
 
-The toolchain uses explicit absolute paths supplied by the operator and performs no home-directory discovery. The long P2 run remains opt-in and must be announced with its 576-step design and expected runtime before execution.
+The toolchain uses explicit absolute paths supplied by the operator and performs no home-directory discovery. Public Toolchain v1.2 provides a P0+P1 normal-user gate; the long P2 run is maintainer-only and requires an explicit confirmation flag after its 576-step design and expected runtime are displayed.
