@@ -1,0 +1,47 @@
+# Public Toolchain v1 — static validation
+
+**Date:** 2026-08-03
+**Scope:** static conversion and fail-closed fixture validation only
+**GPU execution:** **NOT RUN**
+**Neutral fresh-clone execution:** **NOT RUN**
+
+## Result
+
+```text
+PUBLIC_TOOLCHAIN_V1_PYTHON_COMPILE: PASS
+PUBLIC_TOOLCHAIN_V1_SHELL_PARSE: PASS
+PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (7/7)
+PUBLIC_TOOLCHAIN_V1_P0_FAIL_CLOSED_FIXTURE: PASS
+PUBLIC_TOOLCHAIN_V1_PUBLIC_FREEZE_FIXTURE: PASS
+PUBLIC_TOOLCHAIN_V1_PUBLIC_TREE_AUDIT: PASS
+PUBLIC_TOOLCHAIN_V1_GPU_QUALIFICATION: NOT_RUN
+PUBLIC_TOOLCHAIN_V1_FRESH_CLONE_GPU_QUALIFICATION: NOT_RUN
+```
+
+## Validated properties
+
+- all public runtime, source, dataset, and output paths are explicit;
+- no home-directory discovery or project-specific local default path remains;
+- P0 blocks on incomplete source/runtime/dataset fixtures;
+- P1 and P2 numeric/helper self-tests pass;
+- the public freeze verifies P0/P1/P2 manifests and native decision semantics;
+- P0's dataset-object representation and P1/P2's dataset-string representation resolve to the same canonical path;
+- the optional freeze archive does not mutate files already covered by its manifest;
+- shell wrappers parse under `bash -n` and use `set -euo pipefail`;
+- Python sources compile successfully;
+- the repository audit rejects private host paths, credential patterns, nested Git trees, symlinks, native binaries, checkpoints, archives, bytecode, oversized files, invalid JSON, missing executable bits, and incomplete or mismatched repository hashes.
+
+## Commands
+
+```bash
+python3 -m py_compile tools/*.py tests/*.py
+for file in scripts/*.sh; do bash -n "$file"; done
+python3 -m unittest -v tests/test_public_toolchain_v1.py
+python3 tools/audit_public_tree_v1.py --repo .
+```
+
+## Important boundary
+
+This validation proves that the public conversion is structurally self-consistent and fail-closed under its static fixtures. It does **not** prove that a fresh public clone has already reproduced the real R9700 P0/P1/P2 GPU chain. That remains a separate execution gate.
+
+The public requalification tools do not modify or supersede the canonical private A5 freeze `20260803T102615Z_65645`.

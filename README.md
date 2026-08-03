@@ -131,11 +131,28 @@ Not claimed:
 - [Recovery history](docs/RECOVERY_HISTORY.md)
 - [Checkpoint trust policy](docs/CHECKPOINT_TRUST_POLICY.md)
 - [Public release roadmap](docs/PUBLICATION_ROADMAP.md)
+- [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md)
+- [Public Toolchain v1 static validation](evidence-public/PUBLIC_TOOLCHAIN_V1_STATIC_VALIDATION.md)
+- [Public Toolchain v1 tool hashes](evidence-public/PUBLIC_TOOLCHAIN_V1_TOOL_SHA256SUMS.txt)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
-## Publication state
+## Public Toolchain v1
 
-This first public tree is a **documentation and provenance bootstrap**. Audited setup scripts, path-independent qualification tools, sanitized public evidence, and a fresh-clone installer will be added only after their own public-tree conversion gates pass.
+The repository now includes the first path-independent public requalification toolchain:
+
+- fail-closed P0 source/runtime/dataset preflight;
+- real P1 Nerfacto DataManager, forward, backward, optimizer, checkpoint, exact fresh-process reload, and resumed step;
+- sustained P2 A/C/B split-resume qualification using the original 576-step design;
+- a separate public requalification freeze;
+- a public-tree audit that rejects host-specific paths, secrets, nested Git trees, archives, checkpoints, and native binaries.
+
+The public runners do **not** rewrite or supersede the canonical private A5 freeze. They produce a new public requalification chain on each host.
+
+See [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md).
+
+### Publication state
+
+Public Toolchain v1 has passed static self-tests and repository-tree audit. A neutral fresh-clone GPU execution remains a separate qualification step and is not claimed by this commit.
 
 ## Related projects
 

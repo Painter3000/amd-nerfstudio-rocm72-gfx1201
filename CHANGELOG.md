@@ -4,6 +4,10 @@
 
 ### Added
 
+- Public Toolchain v1 with path-independent P0/P1/P2 requalification runners;
+- explicit `gfx1201` / ROCm 7.2 reference manifest;
+- fail-closed public-tree audit and public requalification freeze;
+- static self-test suite for all public tools;
 - public repository bootstrap;
 - exact Nerfacto training-chain scope and nonclaims;
 - A5-P0/P1/P2 qualification summary;
@@ -14,8 +18,7 @@
 
 ### Not yet included
 
-- one-command installer;
-- public path-independent qualification runners;
-- sanitized full public evidence bundle;
-- fresh-clone validation;
+- one-command dependency installer;
+- sanitized full public evidence bundle from an independent host;
+- neutral fresh-clone GPU validation of Public Toolchain v1;
 - VMM performance benchmark.

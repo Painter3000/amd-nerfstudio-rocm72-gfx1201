@@ -48,3 +48,16 @@
 - public functional validation;
 - public-tree audit;
 - annotated tag and release only after every public gate passes.
+
+
+## Public Toolchain v1 milestone
+
+Implemented in the repository after the documentation bootstrap:
+
+```text
+PUBLIC_TOOLCHAIN_V1_STATIC_SELF_TESTS: PASS
+PUBLIC_TOOLCHAIN_V1_PUBLIC_TREE_AUDIT: PASS
+PUBLIC_TOOLCHAIN_V1_FRESH_CLONE_GPU_RUN: NOT_YET_CLAIMED
+```
+
+The toolchain uses explicit absolute paths supplied by the operator and performs no home-directory discovery. The long P2 run remains opt-in and must be announced with its 576-step design and expected runtime before execution.
