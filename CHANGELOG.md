@@ -4,6 +4,11 @@
 
 ### Fixed
 
+- corrected the Fresh-ENV Viser pin from 1.0.0 to the pinned Nerfstudio 1.1.5 dependency, Viser 0.2.7;
+- reject wheelhouses containing both `opencv-python` and `opencv-python-headless`, because both provide the same `cv2` package tree.
+
+### Fixed
+
 - Public Toolchain v1.1 preserves virtual-environment Python launcher paths instead of resolving `venv/bin/python` to the system interpreter;
 - the fix applies consistently to P0, P1, and P2 and includes a symlink regression test.
 

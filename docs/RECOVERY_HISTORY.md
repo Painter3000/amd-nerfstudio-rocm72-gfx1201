@@ -53,3 +53,9 @@ A fail-closed gate can expose a defect in the adapter or orchestrator rather tha
 The two approximately 176 MB files produced by the public P1 replay were initially discussed as possible external resources. Inspection of their run paths and P1 reports confirmed that they were created locally by the producer and fresh reload processes at steps 0 and 1. They are not official Nerfstudio downloads or pretrained model assets.
 
 Public Toolchain v1.2 therefore verifies and deletes both successful smoke-test checkpoints by default. Failed runs retain available checkpoints for recovery, and `--keep-checkpoints` is the explicit opt-in for successful runs.
+
+## 2026-08-03 — Fresh-ENV wheelhouse dependency correction
+
+The first real v1.3 resource download produced a hash-clean 113-wheel cache but exposed a package-contract defect: `viser==1.0.0` pulled `opencv-python` while the scoped Nerfacto seed also required `opencv-python-headless==4.10.0.84`. Both distributions provide the same `cv2` package tree. Installation was stopped before creating the Fresh-ENV.
+
+Recovery: pin Viser 0.2.7, matching the pinned Nerfstudio 1.1.5 release, and reject any wheelhouse containing both OpenCV distribution providers. The previous external cache remains diagnostic evidence and is invalidated automatically by the changed requirements hash.

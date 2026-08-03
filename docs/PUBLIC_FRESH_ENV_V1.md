@@ -195,3 +195,6 @@ Public Toolchain v1.3 does not yet claim:
 - cross-time identity of an online dependency resolution before a published
   wheelhouse lock exists;
 - VMM fallback performance parity.
+
+
+The wheelhouse is locked by SHA-256 after the first successful download. Verification also rejects multiple Python distributions that install the same `cv2` package tree: `opencv-python-headless` is required for this profile and `opencv-python` is forbidden. The Viser version is pinned to 0.2.7 to match the pinned Nerfstudio 1.1.5 source line.

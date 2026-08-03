@@ -109,6 +109,26 @@ def verify_wheelhouse(
     unlisted = sorted(path.name for path in wheelhouse.iterdir() if path.is_file() and path.name not in rows)
     if unlisted:
         mismatches.append({"kind": "UNLISTED_WHEELHOUSE_FILES", "files": unlisted})
+
+    opencv_gui = sorted(name for name in rows if name.lower().replace("-", "_").startswith("opencv_python_") and not name.lower().replace("-", "_").startswith("opencv_python_headless_"))
+    opencv_headless = sorted(name for name in rows if name.lower().replace("-", "_").startswith("opencv_python_headless_"))
+    if opencv_gui and opencv_headless:
+        mismatches.append({
+            "kind": "DUPLICATE_CV2_DISTRIBUTION_PROVIDERS",
+            "opencv_python": opencv_gui,
+            "opencv_python_headless": opencv_headless,
+        })
+    if opencv_gui:
+        mismatches.append({"kind": "FORBIDDEN_GUI_OPENCV_WHEEL", "files": opencv_gui})
+    if not opencv_headless:
+        mismatches.append({"kind": "REQUIRED_HEADLESS_OPENCV_WHEEL_MISSING"})
+
+    viser_027 = sorted(name for name in rows if name.lower().replace("-", "_").startswith("viser_0.2.7_"))
+    other_viser = sorted(name for name in rows if name.lower().replace("-", "_").startswith("viser_") and name not in viser_027)
+    if len(viser_027) != 1:
+        mismatches.append({"kind": "PINNED_VISER_0_2_7_WHEEL_COUNT", "observed": viser_027})
+    if other_viser:
+        mismatches.append({"kind": "UNEXPECTED_VISER_WHEEL", "files": other_viser})
     return {
         "passed": not mismatches,
         "wheelhouse": str(wheelhouse),
@@ -491,11 +511,13 @@ def self_test() -> int:
         wheelhouse.mkdir()
         wheel = wheelhouse / "fixture.whl"
         wheel.write_bytes(b"fixture")
+        (wheelhouse / "opencv_python_headless-4.10.0.84-py3-none-any.whl").write_bytes(b"opencv-headless")
+        (wheelhouse / "viser-0.2.7-py3-none-any.whl").write_bytes(b"viser")
         req = root / "requirements.txt"
         con = root / "constraints.txt"
         manifest = root / "manifest.json"
-        req.write_text("fixture==1\n")
-        con.write_text("fixture==1\n")
+        req.write_text("fixture==1\nopencv-python-headless==4.10.0.84\nviser==0.2.7\n")
+        con.write_text("fixture==1\nopencv-python-headless==4.10.0.84\nviser==0.2.7\n")
         manifest.write_text('{"schema":"fixture"}\n')
         lock_path = root / "lock.json"
         json_dump(lock_path, create_wheelhouse_lock(wheelhouse, req, con, manifest))

@@ -14,6 +14,7 @@ TOOLS = ROOT / "tools"
 sys.path.insert(0, str(TOOLS))
 
 import run_public_a5p1_nerfacto_smoke_v1 as p1_tool
+import setup_public_fresh_env_v1 as fresh_env_tool
 
 
 class PublicToolchainSelfTests(unittest.TestCase):
@@ -195,6 +196,39 @@ class PublicToolchainSelfTests(unittest.TestCase):
         self.assertIn("torchvision==0.28.0+rocm7.2", requirements)
         for excluded in ["gsplat", "open3d", "jupyterlab", "wandb", "comet-ml", "nuscenes-devkit"]:
             self.assertNotIn(excluded, requirements)
+
+    def test_fresh_env_uses_pinned_nerfstudio_viser(self):
+        requirements = (ROOT / "requirements/nerfacto_runtime_v1.txt").read_text(encoding="utf-8")
+        constraints = (ROOT / "constraints/nerfacto_rocm72_py312_v1.txt").read_text(encoding="utf-8")
+        self.assertIn("viser==0.2.7", requirements)
+        self.assertIn("viser==0.2.7", constraints)
+        self.assertNotIn("viser==1.0.0", requirements)
+        self.assertNotIn("viser==1.0.0", constraints)
+
+    def test_wheelhouse_rejects_duplicate_cv2_distribution_providers(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wheelhouse = root / "wheelhouse"
+            wheelhouse.mkdir()
+            for name in [
+                "opencv_python_headless-4.10.0.84-py3-none-any.whl",
+                "opencv_python-4.14.0.94-py3-none-any.whl",
+                "viser-0.2.7-py3-none-any.whl",
+            ]:
+                (wheelhouse / name).write_bytes(name.encode("utf-8"))
+            requirements = root / "requirements.txt"
+            constraints = root / "constraints.txt"
+            manifest = root / "manifest.json"
+            requirements.write_text("opencv-python-headless==4.10.0.84\nviser==0.2.7\n", encoding="utf-8")
+            constraints.write_text("opencv-python-headless==4.10.0.84\nviser==0.2.7\n", encoding="utf-8")
+            manifest.write_text("{}\n", encoding="utf-8")
+            lock_path = root / "lock.json"
+            lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")
+            report = fresh_env_tool.verify_wheelhouse(wheelhouse, lock_path, requirements, constraints, manifest)
+            self.assertFalse(report["passed"])
+            kinds = {row["kind"] for row in report["mismatches"]}
+            self.assertIn("DUPLICATE_CV2_DISTRIBUTION_PROVIDERS", kinds)
+            self.assertIn("FORBIDDEN_GUI_OPENCV_WHEEL", kinds)
 
     def test_resource_manager_self_test(self):
         self.assertTrue(self.run_self_test("manage_public_resources_v1.py")["passed"])

@@ -184,6 +184,8 @@ The default mode asks before public network access. `--auto` approves only pinne
 
 The installer creates a new Python 3.12 virtual environment, downloads a scoped wheelhouse from PyPI plus the official PyTorch ROCm 7.2 index, writes a SHA-256 lock for every fetched wheel, installs only from that local wheelhouse, copies the exact qualified custom runtime inputs, records pip provenance, and runs the normal-user P0+P1 quick validation.
 
+The pinned Nerfstudio 1.1.5 line uses `viser==0.2.7`. Wheelhouse verification requires `opencv-python-headless==4.10.0.84` and rejects a simultaneous `opencv-python` wheel because both distributions install the same `cv2` package tree.
+
 The three custom resources currently have no download URL in the manifest. They must be supplied from an explicit local path or an existing verified cache. A fresh native rebuild is not claimed and is rejected fail-closed.
 
 See [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md).
