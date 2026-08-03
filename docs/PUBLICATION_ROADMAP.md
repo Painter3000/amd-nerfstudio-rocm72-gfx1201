@@ -67,4 +67,4 @@ PUBLIC_TOOLCHAIN_V1_FRESH_NATIVE_BUILD: NOT_CLAIMED
 
 The toolchain uses explicit absolute paths supplied by the operator and performs no home-directory discovery. Public Toolchain v1.2 provides a P0+P1 normal-user gate; the long P2 run is maintainer-only and requires an explicit confirmation flag after its 576-step design and expected runtime are displayed.
 
-Public Toolchain v1.3 implements Stage 3 for a new Python environment using the exact qualified native binary inputs. It also introduces a locked external resource cache and a scoped Nerfacto configuration loader. A real v1.3 fresh-environment GPU run is still required before Stage 5 can be claimed. Fresh native source builds remain a separate future stage.
+Public Toolchain v1.3.2 implements Stage 3 for a new Python environment using the exact qualified native binary inputs. It also introduces a locked external resource cache and a scoped, TensorBoard-only Nerfacto configuration loader with fail-closed Viewer import quarantine. A real v1.3.2 fresh-environment GPU run is still required before Stage 5 can be claimed. Fresh native source builds remain a separate future stage.

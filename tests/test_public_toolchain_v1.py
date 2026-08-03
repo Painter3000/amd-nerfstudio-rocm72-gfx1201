@@ -176,6 +176,11 @@ class PublicToolchainSelfTests(unittest.TestCase):
         ]:
             self.assertNotIn(forbidden, (ROOT / rel).read_text(encoding="utf-8"), msg=rel)
         builder = (ROOT / "tools/public_nerfacto_config_v1.py").read_text(encoding="utf-8")
+        p0_source = (ROOT / "tools/run_public_a5p0_preflight_v1.py").read_text(encoding="utf-8")
+        self.assertLess(
+            p0_source.index("install_viewer_free_import_quarantine()"),
+            p0_source.index("for name in modules:"),
+        )
         for anchor in [
             'method_name="nerfacto"',
             "steps_per_save=2000",
@@ -194,16 +199,91 @@ class PublicToolchainSelfTests(unittest.TestCase):
         requirements = (ROOT / "requirements/nerfacto_runtime_v1.txt").read_text(encoding="utf-8").lower()
         self.assertIn("torch==2.13.0+rocm7.2", requirements)
         self.assertIn("torchvision==0.28.0+rocm7.2", requirements)
-        for excluded in ["gsplat", "open3d", "jupyterlab", "wandb", "comet-ml", "nuscenes-devkit"]:
+        for excluded in ["gsplat", "open3d", "jupyterlab", "wandb", "comet-ml", "nuscenes-devkit", "viser", "pyliblzfse", "yourdfpy"]:
             self.assertNotIn(excluded, requirements)
 
-    def test_fresh_env_uses_pinned_nerfstudio_viser(self):
-        requirements = (ROOT / "requirements/nerfacto_runtime_v1.txt").read_text(encoding="utf-8")
-        constraints = (ROOT / "constraints/nerfacto_rocm72_py312_v1.txt").read_text(encoding="utf-8")
-        self.assertIn("viser==0.2.7", requirements)
-        self.assertIn("viser==0.2.7", constraints)
-        self.assertNotIn("viser==1.0.0", requirements)
-        self.assertNotIn("viser==1.0.0", constraints)
+    def test_fresh_env_contract_is_viewer_free(self):
+        requirements = (ROOT / "requirements/nerfacto_runtime_v1.txt").read_text(encoding="utf-8").lower()
+        constraints = (ROOT / "constraints/nerfacto_rocm72_py312_v1.txt").read_text(encoding="utf-8").lower()
+        builder = (ROOT / "tools/public_nerfacto_config_v1.py").read_text(encoding="utf-8")
+        for forbidden in ["viser", "pyliblzfse", "yourdfpy"]:
+            self.assertNotIn(forbidden, requirements)
+            self.assertNotIn(forbidden, constraints)
+        self.assertIn('vis="tensorboard"', builder)
+        self.assertIn("install_viewer_free_import_quarantine", builder)
+        self.assertIn("VISER_VIEWER_DISABLED_BY_PUBLIC_P0_P1_CONTRACT", builder)
+
+    def test_viewer_free_import_quarantine_is_fail_closed(self):
+        code = f"""
+import sys, types
+sys.path.insert(0, {str(TOOLS)!r})
+root = types.ModuleType('nerfstudio')
+root.__path__ = []
+sys.modules['nerfstudio'] = root
+import public_nerfacto_config_v1 as scoped
+report = scoped.install_viewer_free_import_quarantine()
+import viser
+from nerfstudio.viewer.viewer import Viewer
+from nerfstudio.viewer_legacy.server.viewer_state import ViewerLegacyState
+assert report['policy'] == 'TENSORBOARD_ONLY_VIEWER_IMPORT_QUARANTINE'
+assert getattr(viser, scoped.VIEWER_FREE_STUB_MARKER) is True
+for cls in (Viewer, ViewerLegacyState):
+    try:
+        cls()
+    except scoped.ViewerDisabledError:
+        pass
+    else:
+        raise AssertionError('viewer stub did not fail closed')
+print('VIEWER_FREE_IMPORT_QUARANTINE: PASS')
+"""
+        proc = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), text=True, capture_output=True, check=False)
+        self.assertEqual(0, proc.returncode, msg=proc.stdout + "\n" + proc.stderr)
+        self.assertIn("VIEWER_FREE_IMPORT_QUARANTINE: PASS", proc.stdout)
+
+    def test_wheelhouse_rejects_viewer_dependency_chain(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wheelhouse = root / "wheelhouse"
+            wheelhouse.mkdir()
+            for name in [
+                "opencv_python_headless-4.10.0.84-py3-none-any.whl",
+                "viser-0.2.7-py3-none-any.whl",
+                "pyliblzfse-0.4.1-cp312-cp312-linux_x86_64.whl",
+                "yourdfpy-0.0.60-py3-none-any.whl",
+            ]:
+                (wheelhouse / name).write_bytes(name.encode("utf-8"))
+            requirements = root / "requirements.txt"
+            constraints = root / "constraints.txt"
+            manifest = root / "manifest.json"
+            requirements.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
+            constraints.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
+            manifest.write_text("{}\n", encoding="utf-8")
+            lock_path = root / "lock.json"
+            lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")
+            report = fresh_env_tool.verify_wheelhouse(wheelhouse, lock_path, requirements, constraints, manifest)
+            self.assertFalse(report["passed"])
+            kinds = {row["kind"] for row in report["mismatches"]}
+            self.assertIn("FORBIDDEN_VISER_WHEEL", kinds)
+            self.assertIn("FORBIDDEN_VIEWER_CODEC_WHEEL", kinds)
+            self.assertIn("FORBIDDEN_VIEWER_URDF_WHEEL", kinds)
+
+    def test_wheelhouse_accepts_headless_opencv_without_viewer(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wheelhouse = root / "wheelhouse"
+            wheelhouse.mkdir()
+            name = "opencv_python_headless-4.10.0.84-py3-none-any.whl"
+            (wheelhouse / name).write_bytes(name.encode("utf-8"))
+            requirements = root / "requirements.txt"
+            constraints = root / "constraints.txt"
+            manifest = root / "manifest.json"
+            requirements.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
+            constraints.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
+            manifest.write_text("{}\n", encoding="utf-8")
+            lock_path = root / "lock.json"
+            lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")
+            report = fresh_env_tool.verify_wheelhouse(wheelhouse, lock_path, requirements, constraints, manifest)
+            self.assertTrue(report["passed"], msg=json.dumps(report, indent=2))
 
     def test_wheelhouse_rejects_duplicate_cv2_distribution_providers(self):
         with tempfile.TemporaryDirectory() as td:
@@ -213,14 +293,13 @@ class PublicToolchainSelfTests(unittest.TestCase):
             for name in [
                 "opencv_python_headless-4.10.0.84-py3-none-any.whl",
                 "opencv_python-4.14.0.94-py3-none-any.whl",
-                "viser-0.2.7-py3-none-any.whl",
             ]:
                 (wheelhouse / name).write_bytes(name.encode("utf-8"))
             requirements = root / "requirements.txt"
             constraints = root / "constraints.txt"
             manifest = root / "manifest.json"
-            requirements.write_text("opencv-python-headless==4.10.0.84\nviser==0.2.7\n", encoding="utf-8")
-            constraints.write_text("opencv-python-headless==4.10.0.84\nviser==0.2.7\n", encoding="utf-8")
+            requirements.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
+            constraints.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
             manifest.write_text("{}\n", encoding="utf-8")
             lock_path = root / "lock.json"
             lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")

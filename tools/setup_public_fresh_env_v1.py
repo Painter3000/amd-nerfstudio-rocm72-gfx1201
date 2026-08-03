@@ -123,12 +123,18 @@ def verify_wheelhouse(
     if not opencv_headless:
         mismatches.append({"kind": "REQUIRED_HEADLESS_OPENCV_WHEEL_MISSING"})
 
-    viser_027 = sorted(name for name in rows if name.lower().replace("-", "_").startswith("viser_0.2.7_"))
-    other_viser = sorted(name for name in rows if name.lower().replace("-", "_").startswith("viser_") and name not in viser_027)
-    if len(viser_027) != 1:
-        mismatches.append({"kind": "PINNED_VISER_0_2_7_WHEEL_COUNT", "observed": viser_027})
-    if other_viser:
-        mismatches.append({"kind": "UNEXPECTED_VISER_WHEEL", "files": other_viser})
+    viewer_forbidden = {
+        "viser_": "FORBIDDEN_VISER_WHEEL",
+        "pyliblzfse_": "FORBIDDEN_VIEWER_CODEC_WHEEL",
+        "yourdfpy_": "FORBIDDEN_VIEWER_URDF_WHEEL",
+    }
+    for prefix, kind in viewer_forbidden.items():
+        files = sorted(
+            name for name in rows
+            if name.lower().replace("-", "_").startswith(prefix)
+        )
+        if files:
+            mismatches.append({"kind": kind, "files": files})
     return {
         "passed": not mismatches,
         "wheelhouse": str(wheelhouse),
@@ -383,13 +389,25 @@ def install_environment(args: argparse.Namespace, manifest: dict[str, Any], reso
 
     probe_code = '''
 import json, pathlib, sys
+from importlib import metadata
 import torch
 import nerfacc.csrc as nerfacc_csrc
 import tinycudann.modules as tcnn_modules
 from tinycudann.modules import _C
 sys.path.insert(0, sys.argv[1])
 from public_nerfacto_config_v1 import build_public_nerfacto_config
+
+def distribution_version(name):
+    try:
+        return metadata.version(name)
+    except metadata.PackageNotFoundError:
+        return None
+
 cfg = build_public_nerfacto_config()
+forbidden = {
+  name: distribution_version(name)
+  for name in ("viser", "pyliblzfse", "yourdfpy")
+}
 print(json.dumps({
   "torch": torch.__version__, "hip": torch.version.hip,
   "cuda_available": bool(torch.cuda.is_available()),
@@ -398,6 +416,8 @@ print(json.dumps({
   "tcnn_modules": str(pathlib.Path(tcnn_modules.__file__).resolve()),
   "tcnn_native": str(pathlib.Path(_C.__file__).resolve()),
   "config_type": type(cfg).__name__,
+  "config_vis": cfg.vis,
+  "forbidden_viewer_distributions": forbidden,
 }, sort_keys=True))
 '''
     probe = run_command([str(venv_python), "-c", probe_code, str(repo_root / "tools")], env=runtime_env, timeout=300)
@@ -415,6 +435,9 @@ print(json.dumps({
         and probe_payload.get("hip") == manifest["target"]["hip"]
         and probe_payload.get("cuda_available") is True
         and probe_payload.get("gcn_arch") == manifest["target"]["architecture"]
+        and probe_payload.get("config_vis") == "tensorboard"
+        and all(value is None for value in (probe_payload.get("forbidden_viewer_distributions") or {}).values())
+        and set((probe_payload.get("forbidden_viewer_distributions") or {}).keys()) == {"viser", "pyliblzfse", "yourdfpy"}
         and native_hash == custom["nerfacc_wheel"]["installed_native_sha256"]
     )
 
@@ -512,12 +535,11 @@ def self_test() -> int:
         wheel = wheelhouse / "fixture.whl"
         wheel.write_bytes(b"fixture")
         (wheelhouse / "opencv_python_headless-4.10.0.84-py3-none-any.whl").write_bytes(b"opencv-headless")
-        (wheelhouse / "viser-0.2.7-py3-none-any.whl").write_bytes(b"viser")
         req = root / "requirements.txt"
         con = root / "constraints.txt"
         manifest = root / "manifest.json"
-        req.write_text("fixture==1\nopencv-python-headless==4.10.0.84\nviser==0.2.7\n")
-        con.write_text("fixture==1\nopencv-python-headless==4.10.0.84\nviser==0.2.7\n")
+        req.write_text("fixture==1\nopencv-python-headless==4.10.0.84\n")
+        con.write_text("fixture==1\nopencv-python-headless==4.10.0.84\n")
         manifest.write_text('{"schema":"fixture"}\n')
         lock_path = root / "lock.json"
         json_dump(lock_path, create_wheelhouse_lock(wheelhouse, req, con, manifest))
@@ -577,7 +599,7 @@ def main() -> int:
     if args.mode == "self-test":
         return self_test()
     if args.profile != PROFILE:
-        print("PUBLIC_FRESH_ENV_NOT_STARTED: v1.3 supports only reference-binary-fresh-env; fresh-native-build is not claimed.", file=sys.stderr)
+        print("PUBLIC_FRESH_ENV_NOT_STARTED: v1.3.2 supports only reference-binary-fresh-env; fresh-native-build is not claimed.", file=sys.stderr)
         return 64
     if args.resource_dir is None:
         parser.error("run mode requires --resource-dir")

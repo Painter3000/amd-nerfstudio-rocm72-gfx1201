@@ -4,7 +4,7 @@ This repository directory contains only the public resource policy and
 manifests. Binary resources are stored in an external directory selected with
 `--resource-dir`; they are never committed to this repository.
 
-Public Toolchain v1.3 defines the `reference-binary-fresh-env` cache contract in
+Public Toolchain v1.3.2 defines the `reference-binary-fresh-env` cache contract in
 `config/public_fresh_env_resources_v1.json`.
 
 The external cache contains:
@@ -13,7 +13,7 @@ The external cache contains:
 - the exact qualified `nerfacc` CPython 3.12 wheel;
 - the exact qualified `tiny-rdna4-nn` runtime directory;
 - the exact six-image quick-validation dataset;
-- a Python wheelhouse for the scoped Nerfacto runtime;
+- a viewer-free Python wheelhouse for the scoped Nerfacto TensorBoard runtime;
 - `WHEELHOUSE_LOCK.json`, containing size and SHA-256 for every fetched wheel.
 
 The three qualified custom resources currently have no public download URL in
@@ -29,6 +29,7 @@ Network behavior is fail-closed:
 - online wheel downloads go to a temporary directory and are moved into place
   only after the pip download command succeeds;
 - every completed wheelhouse is immediately SHA-256 locked;
+- wheelhouses containing `opencv-python`, `viser`, `pyliblzfse`, or `yourdfpy` are rejected;
 - installation itself reads only from the locked local wheelhouse.
 
 Generated P1 checkpoints do **not** belong in the cache. They are produced

@@ -10,7 +10,7 @@
 ```text
 PUBLIC_TOOLCHAIN_V1_PYTHON_COMPILE: PASS
 PUBLIC_TOOLCHAIN_V1_SHELL_PARSE: PASS
-PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (18/18)
+PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (21/21)
 PUBLIC_TOOLCHAIN_V1_P0_FAIL_CLOSED_FIXTURE: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_FREEZE_FIXTURE: PASS
 PUBLIC_TOOLCHAIN_V1_PUBLIC_TREE_AUDIT: PASS
@@ -81,9 +81,12 @@ SCOPED_NERFACTO_CONFIG_POLICY: PASS
 OFFLINE_MISSING_RESOURCE_FAIL_CLOSED: PASS
 FRESH_NATIVE_PROFILE_REJECTION: PASS
 WHEELHOUSE_HASH_MUTATION_REJECTION: PASS
-PINNED_VISER_0_2_7_POLICY: PASS
+VIEWER_FREE_REQUIREMENTS_POLICY: PASS
+VIEWER_IMPORT_QUARANTINE_FAIL_CLOSED: PASS
+FORBIDDEN_VIEWER_WHEEL_REJECTION: PASS
 DUPLICATE_CV2_PROVIDER_REJECTION: PASS
-PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (18/18)
+HEADLESS_OPENCV_ONLY_ACCEPTANCE: PASS
+PUBLIC_TOOLCHAIN_V1_SELF_TESTS: PASS (21/21)
 PUBLIC_FRESH_ENV_GPU_EXECUTION: NOT_RUN
 ```
 
@@ -107,3 +110,22 @@ SHA-256-clean lock exposed both `opencv-python` and `opencv-python-headless`.
 The correction pins Viser 0.2.7, matching the pinned Nerfstudio 1.1.5 line,
 and adds fail-closed wheelhouse policy checks for duplicate `cv2` providers.
 The previous external lock is invalidated by the changed requirements hash.
+
+## Public Toolchain v1.3.2 viewer-free correction
+
+The second real resource-resolution attempt stopped before installation because
+Viser 0.2.7 required `pyliblzfse`, for which the binary-only Python 3.12 resolver
+had no compatible wheel. v1.3.2 removes the unused Viewer chain from the
+TensorBoard-only P0+P1 requirements.
+
+Static fixtures verify that:
+
+- `viser`, `pyliblzfse`, and `yourdfpy` are absent from requirements and constraints;
+- a wheelhouse containing any of those distributions is rejected;
+- a headless-OpenCV wheelhouse without Viewer packages is accepted;
+- Nerfstudio's eager `viser`, Viewer, and legacy Viewer imports are quarantined;
+- attempting to instantiate either Viewer stub fails closed;
+- the installed runtime probe requires `vis="tensorboard"` and no installed Viewer distributions.
+
+A real R9700 Fresh-ENV GPU execution remains `NOT_RUN` until the corrected external
+wheelhouse is rebuilt and the offline install completes P0+P1.

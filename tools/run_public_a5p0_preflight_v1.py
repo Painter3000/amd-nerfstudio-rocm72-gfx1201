@@ -79,13 +79,14 @@ try:
     import nerfacc.csrc as nerfacc_csrc
     import tinycudann.modules as tcnn_modules
     from tinycudann.modules import _C
+    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_viewer_free_import_quarantine
+    viewer_policy = install_viewer_free_import_quarantine()
     for name in modules:
         try:
             mod = importlib.import_module(name)
             out["modules"].append({"module": name, "passed": True, "file": str(pathlib.Path(mod.__file__).resolve()) if getattr(mod, "__file__", None) else None})
         except Exception as exc:
             out["modules"].append({"module": name, "passed": False, "error": repr(exc), "traceback": traceback.format_exc()})
-    from public_nerfacto_config_v1 import build_public_nerfacto_config
     cfg = build_public_nerfacto_config()
     dm = cfg.pipeline.datamanager
     origins = {}
@@ -103,11 +104,18 @@ try:
         "nerfacc_native": str(pathlib.Path(nerfacc_csrc.__file__).resolve()),
         "tinycudann_origins": origins,
         "nerfacto_config_type": type(cfg).__name__,
+        "config_vis": cfg.vis,
+        "viewer_import_policy": viewer_policy,
         "datamanager_config_type": type(dm).__name__,
         "has_dataloader_num_workers": hasattr(dm, "dataloader_num_workers"),
         "has_prefetch_factor": hasattr(dm, "prefetch_factor"),
     })
-    out["passed"] = bool(out["cuda_available"] and all(row["passed"] for row in out["modules"]))
+    out["passed"] = bool(
+        out["cuda_available"]
+        and cfg.vis == "tensorboard"
+        and viewer_policy.get("viewer_construction") == "FAIL_CLOSED"
+        and all(row["passed"] for row in out["modules"])
+    )
 except Exception as exc:
     out["error"] = repr(exc)
     out["traceback"] = traceback.format_exc()

@@ -4,6 +4,9 @@
 
 ### Fixed
 
+- Public Toolchain v1.3.2 removes the unneeded Viser dependency chain from the TensorBoard-only P0+P1 profile;
+- quarantine Nerfstudio 1.1.5's eager Viewer imports with fail-closed stubs before `TrainerConfig` is imported;
+- reject wheelhouses containing `viser`, `pyliblzfse`, or `yourdfpy`, and prove their distributions are absent in the installed runtime probe;
 - corrected the Fresh-ENV Viser pin from 1.0.0 to the pinned Nerfstudio 1.1.5 dependency, Viser 0.2.7;
 - reject wheelhouses containing both `opencv-python` and `opencv-python-headless`, because both provide the same `cv2` package tree.
 

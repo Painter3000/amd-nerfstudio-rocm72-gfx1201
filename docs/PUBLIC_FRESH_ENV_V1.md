@@ -2,7 +2,7 @@
 
 ## Scope
 
-Public Toolchain v1.3 adds a fresh Python-environment installer for the qualified
+Public Toolchain v1.3.2 provides a viewer-free fresh Python-environment installer for the qualified
 Nerfacto training-chain scope:
 
 ```text
@@ -181,12 +181,19 @@ Nerfstudio's global method registry, which eagerly imports unrelated models and
 would otherwise force Splatfacto/`gsplat` dependencies into a Nerfacto-only
 environment.
 
-This changes configuration loading, not the qualified model, DataManager,
-optimizer, scheduler, dataset, or training mechanics.
+Nerfstudio 1.1.5 imports `viser` and both Viewer classes while importing
+`TrainerConfig`, even when TensorBoard is selected. The scoped builder therefore
+installs fail-closed import stubs for those Viewer modules before importing the
+upstream Trainer. The stubs are never instantiated under `vis="tensorboard"`; an
+accidental Viewer request raises `VISER_VIEWER_DISABLED_BY_PUBLIC_P0_P1_CONTRACT`.
+
+This changes dependency loading, not the qualified Trainer implementation, model,
+DataManager, optimizer, scheduler, dataset, forward/backward path, checkpoint
+format, or fresh-process reload mechanics.
 
 ## Claim boundary
 
-Public Toolchain v1.3 does not yet claim:
+Public Toolchain v1.3.2 does not yet claim:
 
 - a fresh source build of the native `nerfacc` extension;
 - a fresh source build of the `tiny-rdna4-nn` native extension;
@@ -197,4 +204,4 @@ Public Toolchain v1.3 does not yet claim:
 - VMM fallback performance parity.
 
 
-The wheelhouse is locked by SHA-256 after the first successful download. Verification also rejects multiple Python distributions that install the same `cv2` package tree: `opencv-python-headless` is required for this profile and `opencv-python` is forbidden. The Viser version is pinned to 0.2.7 to match the pinned Nerfstudio 1.1.5 source line.
+The wheelhouse is locked by SHA-256 after the first successful download. Verification rejects multiple Python distributions that install the same `cv2` package tree: `opencv-python-headless` is required and `opencv-python` is forbidden. The viewer-free contract also forbids `viser`, `pyliblzfse`, and `yourdfpy`; the installed-runtime probe confirms that none of those distributions is present and that the scoped config resolves to `vis="tensorboard"`.

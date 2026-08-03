@@ -157,17 +157,20 @@ NERFACTO_TRAINING_CHAIN_NOT_FULL_NERFSTUDIO
 
 Viewer, export, Splatfacto, multi-GPU, unlimited-horizon leak freedom, VMM performance parity, and CUDA performance superiority remain outside the claim.
 
-## v1.3 scoped configuration and fresh environment
+## v1.3.2 scoped configuration and viewer-free fresh environment
 
-Public Toolchain v1.3 adds `tools/public_nerfacto_config_v1.py`. P0, P1, and P2
+Public Toolchain v1.3.2 uses `tools/public_nerfacto_config_v1.py`. P0, P1, and P2
 construct the pinned Nerfacto configuration through this scoped builder instead
 of importing Nerfstudio's global method registry. The global registry eagerly
 imports unrelated models such as Splatfacto and would impose dependencies that
 are outside the qualified Nerfacto scope.
 
-The configuration builder preserves the pinned Nerfacto DataManager, model,
-optimizer, scheduler, viewer configuration object, and numeric defaults from the
-qualified upstream commit.
+The configuration builder preserves the pinned Nerfacto Trainer, DataManager,
+model, optimizer, scheduler, Viewer configuration object, and numeric defaults
+from the qualified upstream commit, while selecting `vis="tensorboard"`. Because
+Nerfstudio 1.1.5 imports Viewer modules eagerly from `trainer.py`, the builder
+quarantines those imports with fail-closed stubs. No Viewer distribution is part
+of the Fresh-ENV contract.
 
 The `reference-binary-fresh-env` installer is documented in
 `PUBLIC_FRESH_ENV_V1.md`. It creates a new Python environment but deliberately

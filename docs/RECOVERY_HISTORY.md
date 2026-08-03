@@ -59,3 +59,16 @@ Public Toolchain v1.2 therefore verifies and deletes both successful smoke-test 
 The first real v1.3 resource download produced a hash-clean 113-wheel cache but exposed a package-contract defect: `viser==1.0.0` pulled `opencv-python` while the scoped Nerfacto seed also required `opencv-python-headless==4.10.0.84`. Both distributions provide the same `cv2` package tree. Installation was stopped before creating the Fresh-ENV.
 
 Recovery: pin Viser 0.2.7, matching the pinned Nerfstudio 1.1.5 release, and reject any wheelhouse containing both OpenCV distribution providers. The previous external cache remains diagnostic evidence and is invalidated automatically by the changed requirements hash.
+
+## 2026-08-03 — Viewer-free P0+P1 dependency contract
+
+The v1.3.1 replacement download correctly removed the duplicate OpenCV provider,
+but failed closed because Viser 0.2.7 requires `pyliblzfse>=0.4.1` on Linux and no
+compatible CPython 3.12 binary wheel was available under the binary-only policy.
+No Fresh-ENV was created.
+
+Recovery: remove the unused Viewer dependency chain from the TensorBoard-only
+P0+P1 requirements, reject `viser`, `pyliblzfse`, and `yourdfpy` in the wheelhouse,
+and quarantine Nerfstudio 1.1.5's eager Viewer imports with non-instantiable
+stubs. The upstream Trainer and all qualified training/checkpoint mechanics remain
+unchanged. The requirements hash again invalidates the previous external lock.

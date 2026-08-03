@@ -167,9 +167,9 @@ This executes only P0 and the two-step P1 producer/reload smoke. Temporary check
 
 P2 is never started by the quick wrapper. The P2 entry point requires an explicit `--maintainer-confirm` acknowledgement.
 
-### Public Toolchain v1.3 fresh environment
+### Public Toolchain v1.3.2 viewer-free fresh environment
 
-Public Toolchain v1.3 adds the `reference-binary-fresh-env` installer:
+Public Toolchain v1.3.2 provides the `reference-binary-fresh-env` installer:
 
 ```bash
 scripts/setup_public_fresh_env_v1.sh \
@@ -184,7 +184,7 @@ The default mode asks before public network access. `--auto` approves only pinne
 
 The installer creates a new Python 3.12 virtual environment, downloads a scoped wheelhouse from PyPI plus the official PyTorch ROCm 7.2 index, writes a SHA-256 lock for every fetched wheel, installs only from that local wheelhouse, copies the exact qualified custom runtime inputs, records pip provenance, and runs the normal-user P0+P1 quick validation.
 
-The pinned Nerfstudio 1.1.5 line uses `viser==0.2.7`. Wheelhouse verification requires `opencv-python-headless==4.10.0.84` and rejects a simultaneous `opencv-python` wheel because both distributions install the same `cv2` package tree.
+Public Toolchain v1.3.2 makes this P0+P1 profile viewer-free. The wheelhouse must contain `opencv-python-headless==4.10.0.84`, must not contain `opencv-python`, and must not contain `viser`, `pyliblzfse`, or `yourdfpy`. A scoped import quarantine prevents Nerfstudio 1.1.5's eager Trainer-time Viewer imports while `vis="tensorboard"`; any attempted viewer construction fails closed.
 
 The three custom resources currently have no download URL in the manifest. They must be supplied from an explicit local path or an existing verified cache. A fresh native rebuild is not claimed and is rejected fail-closed.
 
@@ -192,7 +192,7 @@ See [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md).
 
 ### Publication state
 
-Public Toolchain v1.3 has passed static self-tests and repository-tree audit as an installer candidate. The v1.2 neutral-directory P0+P1 reference-runtime replay has passed. A real fresh-environment GPU execution of v1.3 remains the next qualification gate and is not claimed until that run succeeds.
+Public Toolchain v1.3.2 has passed static self-tests and repository-tree audit as an installer candidate. The v1.2 neutral-directory P0+P1 reference-runtime replay has passed. A real fresh-environment GPU execution of v1.3.2 remains the next qualification gate and is not claimed until that run succeeds.
 
 ## Related projects
 
