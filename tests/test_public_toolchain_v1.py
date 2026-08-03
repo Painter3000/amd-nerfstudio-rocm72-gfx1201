@@ -48,11 +48,15 @@ class PublicToolchainSelfTests(unittest.TestCase):
             runtime.mkdir()
             data.mkdir()
             (data / "transforms.json").write_text('{"frames": []}\n')
+            venv_bin = root / "venv" / "bin"
+            venv_bin.mkdir(parents=True)
+            python_link = venv_bin / "python"
+            python_link.symlink_to(Path(sys.executable).resolve())
             proc = subprocess.run(
                 [
                     sys.executable,
                     str(TOOLS / "run_public_a5p0_preflight_v1.py"),
-                    "--python", sys.executable,
+                    "--python", str(python_link),
                     "--nerfstudio-worktree", str(ns),
                     "--tcnn-runtime", str(runtime),
                     "--dataset", str(data),
@@ -66,6 +70,8 @@ class PublicToolchainSelfTests(unittest.TestCase):
             self.assertFalse(report["passed"])
             self.assertEqual("PUBLIC_A5_P0_BLOCKED", report["decision"])
             self.assertTrue(report["blockers"])
+            self.assertEqual(str(python_link.absolute()), report["paths"]["python"]["path"])
+            self.assertNotEqual(str(Path(sys.executable).resolve()), report["paths"]["python"]["path"])
 
     def test_public_freeze_fixture(self):
         with tempfile.TemporaryDirectory() as td:

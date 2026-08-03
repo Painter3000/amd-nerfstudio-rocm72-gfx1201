@@ -2,6 +2,11 @@
 
 ## Unreleased
 
+### Fixed
+
+- Public Toolchain v1.1 preserves virtual-environment Python launcher paths instead of resolving `venv/bin/python` to the system interpreter;
+- the fix applies consistently to P0, P1, and P2 and includes a symlink regression test.
+
 ### Added
 
 - Public Toolchain v1 with path-independent P0/P1/P2 requalification runners;

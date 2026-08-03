@@ -45,3 +45,12 @@ python3 tools/audit_public_tree_v1.py --repo .
 This validation proves that the public conversion is structurally self-consistent and fail-closed under its static fixtures. It does **not** prove that a fresh public clone has already reproduced the real R9700 P0/P1/P2 GPU chain. That remains a separate execution gate.
 
 The public requalification tools do not modify or supersede the canonical private A5 freeze `20260803T102615Z_65645`.
+
+## Public Toolchain v1.1 correction
+
+```text
+VIRTUAL_ENV_PYTHON_SYMLINK_PRESERVATION: PASS
+P0_P1_P2_PYTHON_PATH_POLICY: ABSOLUTE_WITH_FINAL_SYMLINK_PRESERVED
+```
+
+The regression fixture supplies a synthetic `venv/bin/python` symlink and verifies that the public runner retains the launcher path instead of resolving it to the system interpreter.

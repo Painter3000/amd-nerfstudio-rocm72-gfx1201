@@ -136,9 +136,9 @@ Not claimed:
 - [Public Toolchain v1 tool hashes](evidence-public/PUBLIC_TOOLCHAIN_V1_TOOL_SHA256SUMS.txt)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
-## Public Toolchain v1
+## Public Toolchain v1.1
 
-The repository now includes the first path-independent public requalification toolchain:
+The repository now includes Public Toolchain v1.1, the path-independent public requalification toolchain:
 
 - fail-closed P0 source/runtime/dataset preflight;
 - real P1 Nerfacto DataManager, forward, backward, optimizer, checkpoint, exact fresh-process reload, and resumed step;
@@ -152,7 +152,7 @@ See [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md).
 
 ### Publication state
 
-Public Toolchain v1 has passed static self-tests and repository-tree audit. A neutral fresh-clone GPU execution remains a separate qualification step and is not claimed by this commit.
+Public Toolchain v1.1 preserves explicit virtual-environment Python launchers and has passed static self-tests and repository-tree audit. A neutral fresh-clone GPU execution remains a separate qualification step and is not claimed by this commit.
 
 ## Related projects
 

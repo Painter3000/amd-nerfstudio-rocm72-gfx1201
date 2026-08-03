@@ -20,7 +20,7 @@ import time
 import traceback
 from typing import Any, Iterable
 
-from public_toolchain_common import inspect_dataset as inspect_dataset_common, verify_manifest
+from public_toolchain_common import absolute_preserving_symlink, inspect_dataset as inspect_dataset_common, verify_manifest
 
 SCHEMA = "amd-nerfstudio-public-a5p2-sustained-v1"
 CLASSIFICATION = "PUBLIC_A5_P2_SUSTAINED_REAL_TRAINING_AND_RESUME_TRAJECTORY_V1"
@@ -1091,7 +1091,7 @@ def chmod_tree_readonly(root: Path) -> None:
 
 def orchestrate(args: argparse.Namespace) -> int:
     root = args.output_root.expanduser().resolve()
-    python = args.python.expanduser().resolve()
+    python = absolute_preserving_symlink(args.python)
     dataset = args.data.expanduser().resolve()
     nerfstudio = args.nerfstudio_worktree.expanduser().resolve()
     runtime = args.tcnn_runtime.expanduser().resolve()

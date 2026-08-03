@@ -32,6 +32,18 @@ The first freeze adapter expected a top-level `passed` field in the P0 JSON. The
 
 All five P0 hashes were already exact. Freeze v2 corrected the adapter to evaluate the native P0-v3 contract instead of inventing a uniform field.
 
+## Public A5-P0 v1 — virtual-environment launcher was symlink-resolved
+
+The first public P0 replay received the correct explicit launcher:
+
+```text
+/absolute/path/to/venv/bin/python
+```
+
+but converted every input path with `Path.resolve()`. Because the venv launcher is a symlink, the executed path became `/usr/bin/python3.12`; Python then lost the virtual-environment prefix and the child probe correctly blocked with `ModuleNotFoundError: torch`.
+
+Public Toolchain v1.1 keeps the Python launcher absolute while preserving its final symlink. The same correction is applied to P0, P1, and P2. A regression test now supplies a synthetic `venv/bin/python` symlink and verifies that the report retains that launcher path. The blocked run remains recovery evidence and must not be reused for P1.
+
 ## General rule
 
 A fail-closed gate can expose a defect in the adapter or orchestrator rather than in the object being tested. The blocked run must remain intact, the measurement bug must be versioned, and the corrected attempt must run as a new evidence generation.

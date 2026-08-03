@@ -15,6 +15,10 @@ public P0 preflight
 
 All runtime paths are explicit. The tools do not search user home directories, `Downloads`, project-specific workspaces, or ambient Python installations.
 
+### v1.1 Python-launcher correction
+
+Public Toolchain v1.1 preserves the explicitly supplied `venv/bin/python` path. It intentionally does not resolve the final Python symlink, because doing so changes Python prefix discovery and can replace the virtual-environment launcher with `/usr/bin/python3.12`. Repository, runtime, dataset, and evidence paths remain canonically resolved.
+
 ## Components
 
 | File | Purpose |

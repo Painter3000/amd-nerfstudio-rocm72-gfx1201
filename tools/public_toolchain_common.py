@@ -11,6 +11,16 @@ import time
 from typing import Any, Iterable
 
 
+def absolute_preserving_symlink(path: Path) -> Path:
+    """Return an absolute path without resolving the final symlink.
+
+    Virtual-environment launchers such as ``venv/bin/python`` are commonly
+    symlinks to the system interpreter. Resolving that symlink changes Python's
+    prefix discovery and silently drops the virtual environment.
+    """
+    return Path(os.path.abspath(os.fspath(path.expanduser())))
+
+
 def sha256(path: Path) -> str:
     h = hashlib.sha256()
     with path.open("rb") as handle:

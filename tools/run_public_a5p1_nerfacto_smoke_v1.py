@@ -19,7 +19,7 @@ import time
 import traceback
 from typing import Any, Iterable
 
-from public_toolchain_common import verify_manifest
+from public_toolchain_common import absolute_preserving_symlink, verify_manifest
 
 SCHEMA = "amd-nerfstudio-public-a5p1-nerfacto-smoke-v1"
 CLASSIFICATION = "PUBLIC_A5_P1_NERFACTO_DATALOADER_FORWARD_BACKWARD_CHECKPOINT_V1"
@@ -872,7 +872,7 @@ def chmod_tree_readonly(root: Path) -> None:
 
 def orchestrate(args: argparse.Namespace) -> int:
     output_root = args.output_root.expanduser().resolve()
-    python = args.python.expanduser().resolve()
+    python = absolute_preserving_symlink(args.python)
     dataset = args.data.expanduser().resolve()
     nerfstudio = args.nerfstudio_worktree.expanduser().resolve()
     runtime = args.tcnn_runtime.expanduser().resolve()

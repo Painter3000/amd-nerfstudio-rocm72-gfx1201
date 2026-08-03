@@ -12,6 +12,7 @@ import time
 from typing import Any
 
 from public_toolchain_common import (
+    absolute_preserving_symlink,
     build_runtime_env,
     file_anchor,
     inspect_dataset,
@@ -170,7 +171,7 @@ def main() -> int:
     if any(value is None for value in required):
         parser.error("run mode requires --python, --nerfstudio-worktree, --tcnn-runtime, --dataset and --output-root")
 
-    python = args.python.expanduser().resolve()
+    python = absolute_preserving_symlink(args.python)
     nerfstudio = args.nerfstudio_worktree.expanduser().resolve()
     runtime = args.tcnn_runtime.expanduser().resolve()
     dataset = args.dataset.expanduser().resolve()
