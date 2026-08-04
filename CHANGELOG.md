@@ -1,5 +1,12 @@
 # Changelog
 
+## v1.4.3 - Existing-environment advisory package policy
+
+- keep the Fresh-ENV wheelhouse and installed-runtime package exclusions strict;
+- treat `yourdfpy`, `pyliblzfse`, and multiple installed OpenCV distributions as recorded advisories for an explicitly selected existing environment;
+- retain fail-closed Viewer construction, exact runtime identities, immutable `pip freeze`, and real P0+P1 as the reuse qualification gates;
+- add self-test and unit regression coverage proving advisory package observations do not block an otherwise qualified shared environment.
+
 ## v1.4.2 - Explicit environment routing and apply validation fix
 
 - make the adaptive shell wrapper use the exact `set -euo pipefail` form required by the existing public-tree audit;

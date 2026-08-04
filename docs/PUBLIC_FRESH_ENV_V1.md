@@ -207,7 +207,7 @@ Public Toolchain v1.3.2 does not yet claim:
 The wheelhouse is locked by SHA-256 after the first successful download. Verification rejects multiple Python distributions that install the same `cv2` package tree: `opencv-python-headless` is required and `opencv-python` is forbidden. The viewer-free contract also forbids `viser`, `pyliblzfse`, and `yourdfpy`; the installed-runtime probe confirms that none of those distributions is present and that the scoped config resolves to `vis="tensorboard"`.
 
 
-## v1.4.2 adaptive environment note
+## v1.4.3 adaptive environment note
 
 The adaptive installer may reuse a compatible existing environment unchanged or
 create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only

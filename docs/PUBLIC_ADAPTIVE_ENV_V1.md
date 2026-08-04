@@ -13,8 +13,9 @@ or whether a new isolated environment must be created by the Fresh-ENV path.
 - A compatible existing environment is reused without package mutation.
 - `pip freeze --all` is captured before and after reuse; any unexpected change
   blocks qualification.
-- `pip check` is recorded as advisory evidence and is not the scoped P0/P1
-  compatibility gate for a shared environment.
+- `pip check` and unrelated extra-package presence are recorded as advisory
+  evidence and are not the scoped P0/P1 compatibility gate for a shared
+  environment.
 - An incompatible environment is never repaired in place. `--repair` means a
   safe replacement in a new isolated install root.
 - System Python is never modified implicitly.
@@ -24,8 +25,13 @@ or whether a new isolated environment must be created by the Fresh-ENV path.
 
 Nerfstudio geometry requires `viser.transforms.SO3`. The scoped contract pins
 `viser==1.0.0` as a math-only runtime dependency while viewer construction is
-quarantined fail-closed. `pyliblzfse` and `yourdfpy` remain excluded. The claim
-is therefore **viewer-runtime-disabled**, not “the viser distribution is absent”.
+quarantined fail-closed. A newly created Fresh-ENV still excludes `pyliblzfse`,
+`yourdfpy`, GUI OpenCV, and duplicate `cv2` distribution providers. In an
+explicitly selected existing environment, those extra distributions are
+recorded as advisories rather than package-presence compatibility blockers.
+Reuse still requires the qualified runtime identities, fail-closed Viewer
+quarantine, unchanged `pip freeze`, and successful real P0+P1 validation. The
+claim is therefore **viewer-runtime-disabled**, not “the viser distribution is absent”.
 
 ## Typical reuse
 

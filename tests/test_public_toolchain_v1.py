@@ -445,6 +445,32 @@ print('VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS')
     def test_adaptive_env_installer_self_test(self):
         self.assertTrue(self.run_self_test("setup_public_adaptive_env_v1.py")["passed"])
 
+    def test_adaptive_shared_environment_extras_are_advisory(self):
+        advisory = adaptive_env_tool.shared_environment_advisories({
+            "pyliblzfse": None,
+            "yourdfpy": "0.0.60",
+            "opencv-python": "4.14.0.94",
+            "opencv-python-headless": "5.0.0.93",
+        })
+        result = adaptive_env_tool.finalize_runtime_probe(
+            {"qualified_runtime": True},
+            advisory,
+            {"returncode": 0},
+            {},
+            None,
+        )
+        self.assertFalse(advisory["checks"]["viewer_extras_absent"])
+        self.assertFalse(advisory["checks"]["single_cv2_distribution_provider"])
+        self.assertIn(
+            "SHARED_ENV_EXTRA_PRESENT:yourdfpy==0.0.60",
+            advisory["advisories"],
+        )
+        self.assertTrue(result["passed"])
+        self.assertEqual(
+            "ADVISORY_NOT_COMPATIBILITY_GATE",
+            advisory["policy"],
+        )
+
     def test_adaptive_env_never_repairs_candidate_in_place(self):
         ns = argparse.Namespace(
             env_policy="auto",

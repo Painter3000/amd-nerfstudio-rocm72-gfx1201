@@ -96,6 +96,60 @@ print(json.dumps(payload, sort_keys=True))
     return {"process": process, "payload": payload, "passed": process.get("returncode") == 0 and bool(payload)}
 
 
+
+def shared_environment_advisories(payload: dict[str, Any]) -> dict[str, Any]:
+    """Record extra shared-environment packages without rejecting reuse.
+
+    Fresh-ENV creation remains strict. For an explicitly selected existing
+    environment, package presence alone is not a compatibility gate: the
+    qualified runtime probe, fail-closed Viewer quarantine, and real P0+P1
+    validation decide whether reuse is safe for the scoped Nerfacto path.
+    """
+    viewer_extras = {
+        "pyliblzfse": payload.get("pyliblzfse"),
+        "yourdfpy": payload.get("yourdfpy"),
+    }
+    cv2_providers = {
+        "opencv-python": payload.get("opencv-python"),
+        "opencv-python-headless": payload.get("opencv-python-headless"),
+    }
+    advisories: list[str] = []
+    for name, version in viewer_extras.items():
+        if version is not None:
+            advisories.append(f"SHARED_ENV_EXTRA_PRESENT:{name}=={version}")
+    present_cv2 = [name for name, version in cv2_providers.items() if version is not None]
+    if len(present_cv2) > 1:
+        advisories.append("SHARED_ENV_MULTIPLE_CV2_DISTRIBUTIONS:" + ",".join(present_cv2))
+    return {
+        "policy": "ADVISORY_NOT_COMPATIBILITY_GATE",
+        "checks": {
+            "viewer_extras_absent": all(version is None for version in viewer_extras.values()),
+            "single_cv2_distribution_provider": len(present_cv2) <= 1,
+        },
+        "viewer_extras": viewer_extras,
+        "cv2_providers": cv2_providers,
+        "advisories": advisories,
+    }
+
+
+def finalize_runtime_probe(
+    checks: dict[str, bool],
+    advisory_report: dict[str, Any],
+    process: dict[str, Any],
+    payload: dict[str, Any],
+    nerfacc_hash: str | None,
+) -> dict[str, Any]:
+    """Keep advisory package observations outside the compatibility gate."""
+    return {
+        "passed": all(checks.values()),
+        "checks": checks,
+        "advisory": advisory_report,
+        "process": process,
+        "payload": payload,
+        "nerfacc_native_sha256": nerfacc_hash,
+    }
+
+
 def resolve_candidate_paths(args: argparse.Namespace, manifest: dict[str, Any]) -> dict[str, Any]:
     cache: dict[str, Path] = {}
     if args.resource_dir is not None:
@@ -214,15 +268,15 @@ print(json.dumps({
         "tcnn_origin": tcnn_origin_ok,
         "config_vis": payload.get("config_vis") == "tensorboard",
         "viser_math": payload.get("viser") == expected_viser,
-        "viewer_extras_absent": payload.get("pyliblzfse") is None and payload.get("yourdfpy") is None,
     }
-    return {
-        "passed": all(checks.values()),
-        "checks": checks,
-        "process": process,
-        "payload": payload,
-        "nerfacc_native_sha256": nerfacc_hash,
-    }
+    advisory_report = shared_environment_advisories(payload)
+    return finalize_runtime_probe(
+        checks,
+        advisory_report,
+        process,
+        payload,
+        nerfacc_hash,
+    )
 
 
 def collect_pip_state(python: Path, directory: Path, label: str) -> dict[str, Any]:
@@ -422,6 +476,12 @@ def create_gate(report: dict[str, Any]) -> str:
         f"environment_mutated={str(bool(report.get('environment_mutated'))).upper()}",
         f"validation={report.get('validation')}",
         f"pip_check_policy=ADVISORY",
+        "shared_env_package_policy=ADVISORY_NOT_COMPATIBILITY_GATE",
+        "shared_env_advisories=" + (
+            ",".join((report.get("runtime_probe") or {}).get("advisory", {}).get("advisories", []))
+            if (report.get("runtime_probe") or {}).get("advisory", {}).get("advisories")
+            else "NONE"
+        ),
         "p2_execution=NOT_RUN",
         "",
         f"PUBLIC_RDNA4_ADAPTIVE_PLAN: {'PASS' if checks.get('PLAN') else 'FAIL'}",
@@ -471,6 +531,25 @@ def self_test() -> int:
     checks["no_build_blocks"] = choose_action(ns, False)["action"] == "BLOCKED"
     ns.env_policy = "reuse"
     checks["reuse_incompatible_blocks"] = choose_action(ns, False)["action"] == "BLOCKED"
+    advisory_fixture = shared_environment_advisories({
+        "pyliblzfse": None,
+        "yourdfpy": "0.0.60",
+        "opencv-python": "4.14.0.94",
+        "opencv-python-headless": "5.0.0.93",
+    })
+    finalized_fixture = finalize_runtime_probe(
+        {"qualified_runtime": True},
+        advisory_fixture,
+        {"returncode": 0},
+        {},
+        None,
+    )
+    checks["shared_extras_recorded_as_advisory"] = bool(
+        not advisory_fixture["checks"]["viewer_extras_absent"]
+        and not advisory_fixture["checks"]["single_cv2_distribution_provider"]
+        and advisory_fixture["advisories"]
+    )
+    checks["shared_extras_do_not_block_qualified_runtime"] = finalized_fixture["passed"] is True
     with tempfile.TemporaryDirectory() as td:
         root = Path(td)
         run = root / "run"
@@ -608,6 +687,7 @@ def main() -> int:
         "action": plan["action"],
         "pip_before": before,
         "pip_check_policy": "ADVISORY_NOT_COMPATIBILITY_GATE",
+        "shared_env_package_policy": "ADVISORY_NOT_COMPATIBILITY_GATE",
         "keep_built_wheels_requested": bool(args.keep_built_wheels),
         "nonclaims": manifest.get("nonclaims", []) + [
             "IN_PLACE_MUTATION_OF_EXISTING_SYSTEM_OR_SHARED_ENVIRONMENTS",

@@ -210,12 +210,16 @@ Original helper scripts and documentation added by this repository are covered b
 This is an independent community project and is not an official AMD, Nerfstudio, PyTorch, or NVIDIA repository.
 
 
-### Public Toolchain v1.4.2 adaptive environment
+### Public Toolchain v1.4.3 adaptive environment
 
 The normal entry point can now reuse an already compatible Python 3.12 venv,
-Conda environment, or explicitly selected interpreter without mutating it. If
-reuse is not possible, `auto` can delegate to the pinned Fresh-ENV installer for
-a new isolated environment:
+Conda environment, or explicitly selected interpreter without mutating it. For
+an existing shared environment, unrelated extra packages are recorded as
+advisories; compatibility is decided by the qualified runtime identities,
+fail-closed Viewer quarantine, unchanged package state, and real P0+P1 quick
+validation. The separate Fresh-ENV path remains strict. If reuse is not
+possible, `auto` can delegate to the pinned Fresh-ENV installer for a new
+isolated environment:
 
 ```bash
 scripts/setup_public_adaptive_env_v1.sh \

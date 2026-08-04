@@ -131,7 +131,7 @@ A real R9700 Fresh-ENV GPU execution remains `NOT_RUN` until the corrected exter
 wheelhouse is rebuilt and the offline install completes P0+P1.
 
 
-## v1.4.2 adaptive environment note
+## v1.4.3 adaptive environment note
 
 The adaptive installer receives the candidate explicitly through `--env ENV_ROOT` or `--python PYTHON`. No disk-wide environment search or silent system-Python fallback is allowed. It may reuse a compatible existing environment unchanged or
 create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
