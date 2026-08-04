@@ -1,0 +1,19 @@
+{
+  "schema": "amd-nerfstudio-public-quick-dataset-v2",
+  "classification": "PUBLIC_SYNTHETIC_NERFACTO_QUICK_VALIDATION",
+  "origin": "Created specifically for Painter3000/amd-nerfstudio-rocm72-gfx1201",
+  "generator": "OpenAI ChatGPT procedural synthetic scene generator",
+  "image_count": 6,
+  "width": 128,
+  "height": 128,
+  "camera_model": "OPENCV",
+  "purpose": "Installer validation and real Nerfacto P0+P1 mechanics",
+  "training_quality_claim": "NOT_CLAIMED",
+  "geometric_accuracy_claim": "NOT_CLAIMED",
+  "license": "CC0-1.0",
+  "notes": [
+    "This dataset is a synthetic technical validation dataset.",
+    "It is intended for installation checks and short P0+P1 Nerfacto mechanics validation.",
+    "It is not intended as a benchmark for reconstruction quality, geometry, or photorealism."
+  ]
+}

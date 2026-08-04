@@ -1,0 +1,16 @@
+{
+  "schema": "amd-nerfstudio-public-quick-dataset-manifest-v2",
+  "root": "quick-validation-dataset-v2",
+  "required_files": [
+    "000.png",
+    "001.png",
+    "002.png",
+    "003.png",
+    "004.png",
+    "005.png",
+    "transforms.json",
+    "DATASET_PROVENANCE.json",
+    "README.md",
+    "SHA256SUMS.txt"
+  ]
+}
