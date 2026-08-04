@@ -150,6 +150,23 @@ The following are not claimed by the public v1.4.3 adaptive-installer run:
 > NERFACTO_TRAINING_CHAIN_NOT_FULL_NERFSTUDIO
 > ```
 
+<details>
+<summary><strong>ROCm / gfx1201 port note</strong></summary>
+
+- AMD ROCm / RDNA4 integration and qualification project for the **Nerfacto training chain from Nerfstudio**.
+- Target: AMD Radeon AI PRO R9700 / RDNA4 / `gfx1201`.
+- Stack: ROCm 7.2, Python 3.12, PyTorch `2.13.0+rocm7.2`.
+- Runtime path: `tiny-rdna4-nn`, PyTorch ROCm, and a ROCm-compatible `nerfacc` extension.
+- Qualified scope: Nerfacto training, checkpointing, reload, resume, and validation — **not full Nerfstudio support**.
+- Canonical A5-P2 qualification: `PASS` with 576 frozen training steps.
+- Public Adaptive Installer v1.4.3 qualification: existing-environment reuse plus real P0+P1 validation.
+- Viewer, Splatfacto, multi-GPU, Fresh-ENV GPU execution, and CUDA performance superiority are not claimed.
+- License and attribution: see [`LICENSE`](./LICENSE) and [`NOTICE.md`](./NOTICE.md). Third-party components retain their original licenses.
+
+</details>
+
+---
+
 ## Status
 
 The internal A0–A5 correctness chain is complete and frozen:
@@ -263,6 +280,139 @@ Not claimed:
 - performance superiority over CUDA/NVIDIA;
 - cross-host or cross-checkout binary identity unless separately demonstrated.
 
+## Public Toolchain v1.4.3
+
+Public Toolchain v1.4.3 combines the normal-user validation runners, the strict
+Fresh-ENV fallback, and the qualified adaptive existing-environment path into
+one current workflow.
+
+Older v1.2 and v1.3.2 headings are retained in [`CHANGELOG.md`](CHANGELOG.md)
+and the detailed documentation. Their functionality remains part of the current
+toolchain; users do not need to choose between three separate toolchain
+versions.
+
+### Recommended path — adaptive existing environment
+
+The normal entry point can reuse an already compatible Python 3.12 virtual
+environment, Conda environment, or explicitly selected interpreter without
+mutating it:
+
+```bash
+scripts/setup_public_adaptive_env_v1.sh \
+  --env /path/to/selected/environment \
+  --resource-dir "$PWD/resource-cache-v1" \
+  --install-root "$PWD/rdna4-nerfacto-env" \
+  --quick
+```
+
+The environment is always selected explicitly. The installer does not search
+the disk and does not silently fall back to system Python. Existing
+environments use `ENV_ROOT/bin/python`; isolated fallback still requires an
+explicit `--install-root`.
+
+For an existing shared environment, unrelated extra packages are recorded as
+advisories. Compatibility is decided by the qualified runtime identities,
+fail-closed Viewer quarantine, unchanged package state, and the real P0+P1
+quick validation.
+
+`pip check` is advisory for an existing shared environment. `--repair` creates
+an isolated replacement and never modifies the candidate environment in place.
+If reuse is not possible, `auto` can delegate to the pinned Fresh-ENV installer.
+
+See [Public adaptive environment v1](docs/PUBLIC_ADAPTIVE_ENV_V1.md).
+
+### Strict fallback — fresh environment
+
+The strict `reference-binary-fresh-env` path creates a new isolated Python 3.12
+environment:
+
+```bash
+scripts/setup_public_fresh_env_v1.sh \
+  --resource-dir "$PWD/resource-cache-v1" \
+  --install-root "$PWD/fresh-env-v1" \
+  --nerfacc-wheel /path/to/qualified-nerfacc.whl \
+  --tcnn-runtime /path/to/qualified-tiny-rdna4-nn-runtime \
+  --dataset /path/to/qualified-quick-dataset
+```
+
+The default mode asks before public network access. `--auto` approves only
+pinned public operations; `--offline` forbids network access;
+`--download-only` prepares the cache; and `--verify-resources` performs
+non-mutating verification.
+
+The installer downloads a scoped wheelhouse from PyPI plus the official
+PyTorch ROCm 7.2 index, writes a SHA-256 lock for every fetched wheel, installs
+only from the local wheelhouse, copies the exact qualified custom runtime
+inputs, records pip provenance, and runs the normal-user P0+P1 quick
+validation.
+
+The Fresh-ENV profile remains strict and viewer-free. Its wheelhouse must
+contain `opencv-python-headless==4.10.0.84`, must not contain
+`opencv-python`, and must not contain `viser`, `pyliblzfse`, or `yourdfpy`.
+A scoped import quarantine prevents Nerfstudio 1.1.5's eager Trainer-time
+Viewer imports while `vis="tensorboard"`; attempted Viewer construction fails
+closed.
+
+The three custom resources currently have no download URL in the manifest.
+They must be supplied through explicit local paths or an existing verified
+cache. A fresh native rebuild is not claimed and is rejected fail-closed.
+
+See [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md).
+
+### Validation paths
+
+The normal-user quick validation executes P0 and the two-step P1
+producer/reload smoke:
+
+```bash
+scripts/run_public_quick_validation_v1.sh
+```
+
+Before running it directly, set the five explicit
+`NERFSTUDIO_RDNA4_PUBLIC_*` path variables described in the toolchain
+documentation.
+
+Temporary P1 checkpoints are hash-verified and removed after a successful run.
+Use `--keep-checkpoints` only when the files are needed for debugging or
+evidence retention.
+
+P2 is never started by the quick wrapper. Its entry point is maintainer-only
+and requires explicit `--maintainer-confirm` acknowledgement.
+
+The public runners do not rewrite or supersede the canonical A5 freeze. They
+produce a separate public requalification chain on each host.
+
+See [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md).
+
+<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
+### Current public qualification
+
+Public Toolchain v1.4.3 completed a real adaptive-reuse qualification on the
+AMD Radeon AI PRO R9700 against implementation commit
+`8104a4c6cce4b45cc7fd92d50cd9a8b2699e8a0f` and tree
+`9cd8f5e389899fca64b6c1e65d3c81b2ce825178`.
+
+The explicitly selected environment was reused unchanged, `pip freeze`
+remained identical, the runtime and provenance gates passed, and the short
+public P0+P1 Nerfacto GPU validation passed.
+
+```text
+ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION_FREEZE: PASS
+EXISTING_ENV_REUSED_AND_QUALIFIED: PASS
+PUBLIC_RDNA4_QUICK_VALIDATION: PASS
+P2_EXECUTION: NOT_RUN
+FRESH_ENV_GPU_EXECUTION: NOT_RUN
+```
+
+`P2_EXECUTION: NOT_RUN` refers only to this later public adaptive-installer
+qualification. The canonical frozen A5-P2 run remains `PASS`.
+
+A real GPU execution of the separately created Fresh-ENV remains unqualified
+and is not claimed.
+
+See [the sanitized qualification evidence](evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION.md).
+<!-- END ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
+
 ## Documentation
 
 - [Qualification scope](docs/QUALIFICATION_SCOPE.md)
@@ -281,81 +431,6 @@ Not claimed:
 - [Resource-cache policy](resources/README.md)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
-## Public Toolchain v1.2
-
-The repository now includes Public Toolchain v1.2, with a short normal-user validation path and a separately guarded maintainer qualification path:
-
-- fail-closed P0 source/runtime/dataset preflight;
-- real P1 Nerfacto DataManager, forward, backward, optimizer, checkpoint, exact fresh-process reload, and resumed step;
-- one-command P0+P1 quick validation that never launches P2;
-- verified deletion of temporary P1 checkpoints by default, with `--keep-checkpoints` as an explicit opt-in;
-- sustained P2 A/C/B split-resume qualification using the original 576-step design, guarded as maintainer-only;
-- a separate public requalification freeze;
-- a public-tree audit that rejects host-specific paths, secrets, nested Git trees, archives, checkpoints, and native binaries.
-
-The public runners do **not** rewrite or supersede the canonical private A5 freeze. They produce a new public requalification chain on each host.
-
-See [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md).
-
-### Normal user validation
-
-After setting the five explicit `NERFSTUDIO_RDNA4_PUBLIC_*` path variables described in the toolchain documentation:
-
-```bash
-scripts/run_public_quick_validation_v1.sh
-```
-
-This executes only P0 and the two-step P1 producer/reload smoke. Temporary checkpoints are hash-verified and removed after a successful run. Use `--keep-checkpoints` only when the files are needed for debugging or evidence retention.
-
-P2 is never started by the quick wrapper. The P2 entry point requires an explicit `--maintainer-confirm` acknowledgement.
-
-### Public Toolchain v1.3.2 viewer-free fresh environment
-
-Public Toolchain v1.3.2 provides the `reference-binary-fresh-env` installer:
-
-```bash
-scripts/setup_public_fresh_env_v1.sh \
-  --resource-dir "$PWD/resource-cache-v1" \
-  --install-root "$PWD/fresh-env-v1" \
-  --nerfacc-wheel /path/to/qualified-nerfacc.whl \
-  --tcnn-runtime /path/to/qualified-tiny-rdna4-nn-runtime \
-  --dataset /path/to/qualified-quick-dataset
-```
-
-The default mode asks before public network access. `--auto` approves only pinned public operations; `--offline` forbids network access; `--download-only` prepares the cache; and `--verify-resources` performs non-mutating verification.
-
-The installer creates a new Python 3.12 virtual environment, downloads a scoped wheelhouse from PyPI plus the official PyTorch ROCm 7.2 index, writes a SHA-256 lock for every fetched wheel, installs only from that local wheelhouse, copies the exact qualified custom runtime inputs, records pip provenance, and runs the normal-user P0+P1 quick validation.
-
-Public Toolchain v1.3.2 makes this P0+P1 profile viewer-free. The wheelhouse must contain `opencv-python-headless==4.10.0.84`, must not contain `opencv-python`, and must not contain `viser`, `pyliblzfse`, or `yourdfpy`. A scoped import quarantine prevents Nerfstudio 1.1.5's eager Trainer-time Viewer imports while `vis="tensorboard"`; any attempted viewer construction fails closed.
-
-The three custom resources currently have no download URL in the manifest. They must be supplied from an explicit local path or an existing verified cache. A fresh native rebuild is not claimed and is rejected fail-closed.
-
-See [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md).
-
-### Publication state
-
-Public Toolchain v1.3.2 has passed static self-tests and repository-tree audit as an installer candidate. The v1.2 neutral-directory P0+P1 reference-runtime replay has passed. A real fresh-environment GPU execution of v1.3.2 remains the next qualification gate and is not claimed until that run succeeds.
-
-<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
-### Public Toolchain v1.4.3 qualified adaptive existing environment
-
-Public Toolchain v1.4.3 has completed a real R9700 adaptive-reuse qualification
-against implementation commit `8104a4c6cce4b45cc7fd92d50cd9a8b2699e8a0f` and tree `9cd8f5e389899fca64b6c1e65d3c81b2ce825178`.
-The explicitly selected environment was reused unchanged, `pip freeze` remained
-identical, the runtime/provenance gates passed, and the short public P0+P1
-Nerfacto GPU validation passed. P2 and long-duration training were not run.
-
-```text
-ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION_FREEZE: PASS
-EXISTING_ENV_REUSED_AND_QUALIFIED: PASS
-PUBLIC_RDNA4_QUICK_VALIDATION: PASS
-P2_EXECUTION: NOT_RUN
-FRESH_ENV_GPU_EXECUTION: NOT_RUN
-```
-
-See [the sanitized qualification evidence](evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION.md).
-<!-- END ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
-
 ## Related projects
 
 - [Painter3000/tiny-rdna4-nn](https://github.com/Painter3000/tiny-rdna4-nn)
@@ -369,35 +444,3 @@ See [the sanitized qualification evidence](evidence-public/ADAPTIVE_INSTALLER_V1
 Original helper scripts and documentation added by this repository are covered by the repository license. Third-party projects retain their own licenses and are not relicensed here.
 
 This is an independent community project and is not an official AMD, Nerfstudio, PyTorch, or NVIDIA repository.
-
-
-### Public Toolchain v1.4.3 adaptive environment
-
-The normal entry point can now reuse an already compatible Python 3.12 venv,
-Conda environment, or explicitly selected interpreter without mutating it. For
-an existing shared environment, unrelated extra packages are recorded as
-advisories; compatibility is decided by the qualified runtime identities,
-fail-closed Viewer quarantine, unchanged package state, and real P0+P1 quick
-validation. The separate Fresh-ENV path remains strict. If reuse is not
-possible, `auto` can delegate to the pinned Fresh-ENV installer for a new
-isolated environment:
-
-```bash
-scripts/setup_public_adaptive_env_v1.sh \
-  --env /path/to/selected/environment \
-  --resource-dir "$PWD/resource-cache-v1" \
-  --install-root "$PWD/rdna4-nerfacto-env" \
-  --quick
-```
-
-`pip check` is advisory for an existing shared environment; P0+P1 is the scoped
-functional gate. `--repair` creates an isolated replacement and never changes
-the candidate in place. The Viewer policy now pins `viser==1.0.0` only for
-`viser.transforms.SO3`; Viewer construction remains fail-closed.
-
-The environment is always selected explicitly. The installer does not search the
-disk and does not silently fall back to system Python. Existing environments use
-`ENV_ROOT/bin/python`; isolated fallback still requires an explicit
-`--install-root`.
-
-See [Public adaptive environment v1](docs/PUBLIC_ADAPTIVE_ENV_V1.md).
