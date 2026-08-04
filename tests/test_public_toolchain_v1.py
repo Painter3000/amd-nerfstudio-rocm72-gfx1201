@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -239,6 +240,106 @@ print('VIEWER_FREE_IMPORT_QUARANTINE: PASS')
         proc = subprocess.run([sys.executable, "-c", code], cwd=str(ROOT), text=True, capture_output=True, check=False)
         self.assertEqual(0, proc.returncode, msg=proc.stdout + "\n" + proc.stderr)
         self.assertIn("VIEWER_FREE_IMPORT_QUARANTINE: PASS", proc.stdout)
+
+    def test_viewer_free_quarantine_preserves_viser_transforms_bridge(self):
+        code = f"""
+import sys, types
+sys.path.insert(0, {str(TOOLS)!r})
+
+root = types.ModuleType('nerfstudio')
+root.__path__ = []
+sys.modules['nerfstudio'] = root
+
+import public_nerfacto_config_v1 as scoped
+
+first = scoped.install_viewer_free_import_quarantine()
+second = scoped.install_viewer_free_import_quarantine()
+
+import viser
+import viser.transforms as vtf
+
+assert first['viewer_construction'] == 'FAIL_CLOSED'
+assert second['viewer_construction'] == 'FAIL_CLOSED'
+assert getattr(viser, scoped.VIEWER_FREE_STUB_MARKER) is True
+assert getattr(viser, '__file__', None) is None
+assert hasattr(viser, '__path__')
+assert viser.transforms is vtf
+assert hasattr(vtf, 'SO3')
+
+assert viser.ViserServer is scoped._ViserServerUnavailable
+
+print('VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS')
+"""
+        proc = subprocess.run(
+            [sys.executable, "-c", code],
+            cwd=str(ROOT),
+            text=True,
+            capture_output=True,
+            check=False,
+        )
+        self.assertEqual(
+            0,
+            proc.returncode,
+            msg=proc.stdout + "\n" + proc.stderr,
+        )
+        self.assertIn(
+            "VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS",
+            proc.stdout,
+        )
+
+    def test_p1_quarantine_precedes_single_sh_guard(self):
+        source = (
+            ROOT / "tools/run_public_a5p1_nerfacto_smoke_v1.py"
+        ).read_text(encoding="utf-8")
+
+        tree = ast.parse(source)
+
+        children = [
+            node
+            for node in tree.body
+            if isinstance(node, ast.FunctionDef)
+            and node.name == "child_execute"
+        ]
+        self.assertEqual(1, len(children))
+
+        child = children[0]
+        quarantine_lines = []
+        sh_guard_lines = []
+
+        for node in ast.walk(child):
+            if not isinstance(node, ast.Call):
+                continue
+            if not isinstance(node.func, ast.Name):
+                continue
+
+            if node.func.id == "install_viewer_free_import_quarantine":
+                quarantine_lines.append(node.lineno)
+            elif node.func.id == "install_single_sh_guard":
+                sh_guard_lines.append(node.lineno)
+
+        self.assertEqual(
+            1,
+            len(quarantine_lines),
+            msg="Expected one quarantine activation in child_execute()",
+        )
+        self.assertEqual(
+            1,
+            len(sh_guard_lines),
+            msg="Expected one single-SH guard in child_execute()",
+        )
+        self.assertLess(
+            quarantine_lines[0],
+            sh_guard_lines[0],
+            msg=(
+                "Viewer quarantine must run before the SH guard imports "
+                "Nerfstudio encodings"
+            ),
+        )
+        self.assertIn(
+            'report["viewer_import_policy"] = viewer_import_policy',
+            source,
+        )
+
 
     def test_wheelhouse_rejects_viewer_dependency_chain(self):
         with tempfile.TemporaryDirectory() as td:

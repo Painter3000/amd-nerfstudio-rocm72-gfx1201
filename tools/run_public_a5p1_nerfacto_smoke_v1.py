@@ -636,6 +636,13 @@ def child_execute(mode: str, root: Path, data: Path, run_dir: Path, seed: int, r
         torch.cuda.set_device(0)
         torch.cuda.empty_cache()
         torch.cuda.reset_peak_memory_stats()
+        # NERFSTUDIO_RDNA4_P1_QUARANTINE_ORDER_V1_BEGIN
+        from public_nerfacto_config_v1 import (
+            install_viewer_free_import_quarantine,
+        )
+        viewer_import_policy = install_viewer_free_import_quarantine()
+        report["viewer_import_policy"] = viewer_import_policy
+        # NERFSTUDIO_RDNA4_P1_QUARANTINE_ORDER_V1_END
         install_single_sh_guard()
         identity_before = runtime_identity()
         report["runtime_identity_before_setup"] = identity_before

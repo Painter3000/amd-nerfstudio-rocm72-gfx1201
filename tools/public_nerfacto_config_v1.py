@@ -88,6 +88,33 @@ def install_viewer_free_import_quarantine() -> dict[str, Any]:
 
     importlib.import_module("nerfstudio")
     _require_absent_or_stub("viser")
+
+    # NERFSTUDIO_RDNA4_VIEWER_TRANSFORMS_BRIDGE_V2_BEGIN
+    import importlib as _viewer_importlib
+    import sys as _viewer_sys
+
+    # All fail-closed pre-import guards have passed. Load only the
+    # mathematical transforms subtree, retain it, then remove the real
+    # viser package before the existing quarantine installs its stub.
+    try:
+        _viewer_free_vtf = _viewer_importlib.import_module("viser.transforms")
+    except Exception as _viewer_transforms_exc:
+        raise RuntimeError(
+            "Viewer-free Nerfacto requires viser.transforms for "
+            "OrientedBox rotation mathematics"
+        ) from _viewer_transforms_exc
+
+    _viewer_transform_modules = {
+        name: module
+        for name, module in list(_viewer_sys.modules.items())
+        if name == "viser.transforms"
+        or name.startswith("viser.transforms.")
+    }
+
+    for _viewer_name in list(_viewer_sys.modules):
+        if _viewer_name == "viser" or _viewer_name.startswith("viser."):
+            _viewer_sys.modules.pop(_viewer_name, None)
+    # NERFSTUDIO_RDNA4_VIEWER_TRANSFORMS_BRIDGE_V2_END
     _install_module_stub("viser", ViserServer=_ViserServerUnavailable)
 
     _install_package_stub("nerfstudio.viewer")
@@ -99,6 +126,25 @@ def install_viewer_free_import_quarantine() -> dict[str, Any]:
         "nerfstudio.viewer_legacy.server.viewer_state",
         ViewerLegacyState=_ViewerUnavailable,
     )
+
+
+    # NERFSTUDIO_RDNA4_VIEWER_TRANSFORMS_BRIDGE_V2_BEGIN
+    _viewer_viser_stub = _viewer_sys.modules.get("viser")
+    if _viewer_viser_stub is None:
+        raise RuntimeError(
+            "Viewer quarantine did not create the expected viser stub"
+        )
+
+    # Make the fail-closed stub package-like and expose only the retained
+    # transforms subtree required by Nerfstudio geometry code.
+    _viewer_viser_stub.__path__ = []
+    _viewer_viser_stub.__package__ = "viser"
+
+    for _viewer_name, _viewer_module in _viewer_transform_modules.items():
+        _viewer_sys.modules[_viewer_name] = _viewer_module
+
+    _viewer_viser_stub.transforms = _viewer_free_vtf
+    # NERFSTUDIO_RDNA4_VIEWER_TRANSFORMS_BRIDGE_V2_END
 
     return {
         "policy": "TENSORBOARD_ONLY_VIEWER_IMPORT_QUARANTINE",
