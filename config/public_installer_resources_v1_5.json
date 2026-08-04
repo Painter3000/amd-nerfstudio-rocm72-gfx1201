@@ -1,6 +1,6 @@
 {
   "schema": "amd-nerfstudio-public-installer-resources-v1-5",
-  "version": "1.5.0-dev1",
+  "version": "1.5.0-dev2",
   "scope": "EMPTY_DIRECTORY_OR_EXPLICIT_ENV_INSTALLER_FOR_GFX1201",
   "target": {
     "architecture": "gfx1201",
@@ -93,10 +93,28 @@
     "manifest_sha256": "c65f1858a7d5ccfd5ed8fc453e1230cab9c588837b5f045c613c8ec36fd15746"
   },
   "implementation_stage": {
-    "stage": "PATH_AND_HOST_PREFLIGHT",
-    "network_downloads": "NOT_IMPLEMENTED",
-    "env_creation": "NOT_IMPLEMENTED",
+    "stage": "MANAGED_ENV_PREPARATION",
+    "network_downloads": "PYPI_BUILD_BASE_ONLY",
+    "env_creation": "IMPLEMENTED_EXPLICIT_PREPARE_ENV",
+    "torch_install": "NOT_IMPLEMENTED",
     "native_build": "NOT_IMPLEMENTED",
     "p0_p1": "NOT_IMPLEMENTED"
+  },
+  "environment_bootstrap": {
+    "mode": "MANAGED_ENV_CREATE_OR_REFRESH",
+    "explicit_external_env": "VERIFY_ONLY_NO_MODIFICATION",
+    "managed_marker": ".amd-nerfstudio-managed-v1.json",
+    "public_index": "https://pypi.org/simple",
+    "packages": {
+      "pip": "26.1.2",
+      "setuptools": "83.0.0",
+      "wheel": "0.47.0",
+      "packaging": "26.2",
+      "ninja": "1.13.0",
+      "cmake": "4.4.0"
+    },
+    "failure_cleanup": "REMOVE_ONLY_ENV_CREATED_BY_CURRENT_INVOCATION_WHILE_MARKED_INCOMPLETE",
+    "activation_required": false,
+    "python_invocation": "ENV_ROOT/bin/python"
   }
 }

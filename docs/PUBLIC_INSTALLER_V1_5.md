@@ -50,9 +50,36 @@ The preflight checks the capabilities provided by:
 It also checks the selected ROCm root for `hipcc`, the ROCm Clang compiler,
 `roc-obj-ls`, HIP headers, and `libamdhip64`.
 
+## Managed environment preparation
+
+The second v1.5 stage adds an explicit `--prepare-env` action. A passing host
+preflight may create `$WORKDIR/venv` and install the pinned Python build base.
+The installer does not require shell activation; every command uses
+`$WORKDIR/venv/bin/python` directly.
+
+```bash
+python3.12 ./amd_nerfstudio_setup.py \
+  --workdir "$HOME/nerfstudio" \
+  --rocm-path /opt/rocm \
+  --arch gfx1201 \
+  --validation quick \
+  --prepare-env
+```
+
+The managed environment receives a marker named
+`.amd-nerfstudio-managed-v1.json`. An incomplete environment created by the
+current invocation is removed on failure. Existing unmarked environments are
+not repaired or deleted. An explicitly selected external environment is only
+verified and is never modified by this stage.
+
+The pinned build base is: `pip`, `setuptools`, `wheel`, `packaging`, `ninja`,
+and `cmake`. The exact versions are recorded in
+`config/public_installer_resources_v1_5.json`.
+
 ## Current implementation stage
 
-The first v1.5 commit implements path resolution, environment selection, host
-package diagnostics, ROCm development-stack diagnostics, root rejection, JSON
-reporting, and self-tests. It does not yet create an environment, download
-resources, compile `tiny-rdna4-nn`, or run P0/P1.
+The current v1.5 development stage implements path resolution, host and ROCm
+preflight, managed environment creation, pinned Python build-base installation,
+managed ownership markers, cleanup of incomplete newly-created environments,
+JSON reporting, and self-tests. It does not yet install ROCm PyTorch, clone or
+compile `tiny-rdna4-nn`, install Nerfstudio, or run P0/P1.

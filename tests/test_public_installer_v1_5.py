@@ -66,6 +66,41 @@ class PublicInstallerV15Tests(unittest.TestCase):
         self.assertIn("sudo apt update", text)
         self.assertIn("sudo apt install --no-install-recommends", text)
 
+
+    def test_build_package_requirements_are_pinned(self) -> None:
+        self.assertEqual(
+            [f"{name}=={version}" for name, version in installer.BUILD_PACKAGE_PINS.items()],
+            installer.build_package_requirements(),
+        )
+
+    def test_managed_marker_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            env = Path(td) / "venv"
+            payload = installer.managed_marker_payload(env, "READY")
+            self.assertEqual("amd-nerfstudio-managed-env-v1", payload["schema"])
+            self.assertEqual(str(env), payload["environment"])
+            self.assertEqual("READY", payload["state"])
+
+    def test_external_env_preparation_is_verify_only(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            report = {
+                "passed": True,
+                "environment_selection": {
+                    "action": "REUSE_EXISTING_ENV",
+                    "path": str(root / "external"),
+                },
+            }
+            original = installer.probe_python_packages
+            try:
+                installer.probe_python_packages = lambda python: {"passed": False}
+                result = installer.prepare_environment(report)
+            finally:
+                installer.probe_python_packages = original
+            self.assertFalse(result["passed"])
+            self.assertFalse(result["modified"])
+            self.assertEqual("EXPLICIT_ENV_BUILD_BASE_INCOMPLETE", result["reason"])
+
     def test_self_test(self) -> None:
         self.assertEqual(0, installer.self_test())
 

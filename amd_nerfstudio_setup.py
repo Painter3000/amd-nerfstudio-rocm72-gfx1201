@@ -11,10 +11,11 @@ import subprocess
 import sys
 import sysconfig
 import tempfile
+from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev1"
-SCHEMA = "amd-nerfstudio-public-installer-v1-5-preflight"
+VERSION = "1.5.0-dev2"
+SCHEMA = "amd-nerfstudio-public-installer-v1-5-env-preparation"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
 SUPPORTED_ARCH = "gfx1201"
@@ -36,8 +37,25 @@ APT_PACKAGE_ORDER = [
     "unzip",
 ]
 
+BUILD_PACKAGE_PINS = {
+    "pip": "26.1.2",
+    "setuptools": "83.0.0",
+    "wheel": "0.47.0",
+    "packaging": "26.2",
+    "ninja": "1.13.0",
+    "cmake": "4.4.0",
+}
+MANAGED_ENV_MARKER = ".amd-nerfstudio-managed-v1.json"
+PYPI_INDEX = "https://pypi.org/simple"
 
-def run_command(argv: list[str], timeout: int = 30) -> dict[str, Any]:
+
+def run_command(
+    argv: list[str],
+    timeout: int = 30,
+    *,
+    cwd: Path | None = None,
+    env: dict[str, str] | None = None,
+) -> dict[str, Any]:
     try:
         proc = subprocess.run(
             argv,
@@ -46,6 +64,8 @@ def run_command(argv: list[str], timeout: int = 30) -> dict[str, Any]:
             stderr=subprocess.PIPE,
             timeout=timeout,
             check=False,
+            cwd=str(cwd) if cwd is not None else None,
+            env=env,
         )
     except Exception as exc:
         return {
@@ -273,6 +293,235 @@ def rocm_probe(rocm_path: Path) -> dict[str, Any]:
     }
 
 
+def build_package_requirements() -> list[str]:
+    return [f"{name}=={version}" for name, version in BUILD_PACKAGE_PINS.items()]
+
+
+def probe_python_packages(python: Path) -> dict[str, Any]:
+    names = list(BUILD_PACKAGE_PINS)
+    code = r'''import json
+import shutil
+import sys
+from importlib import metadata
+
+names = json.loads(sys.argv[1])
+versions = {}
+for name in names:
+    try:
+        versions[name] = metadata.version(name)
+    except metadata.PackageNotFoundError:
+        versions[name] = None
+print(json.dumps({
+    "versions": versions,
+    "python": sys.executable,
+    "cmake": shutil.which("cmake"),
+    "ninja": shutil.which("ninja"),
+}, sort_keys=True))
+'''
+    env = dict(os.environ)
+    env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
+    result = run_command(
+        [str(python), "-c", code, json.dumps(names)],
+        timeout=60,
+        env=env,
+    )
+    payload: dict[str, Any] = {}
+    if result.get("returncode") == 0:
+        try:
+            payload = json.loads(result.get("stdout", "").splitlines()[-1])
+        except Exception:
+            payload = {}
+    versions = payload.get("versions", {})
+    checks = {
+        name: versions.get(name) == version
+        for name, version in BUILD_PACKAGE_PINS.items()
+    }
+    checks["cmake_command_from_env"] = bool(payload.get("cmake")) and Path(payload["cmake"]).parent == python.parent
+    checks["ninja_command_from_env"] = bool(payload.get("ninja")) and Path(payload["ninja"]).parent == python.parent
+    return {
+        "passed": result.get("returncode") == 0 and all(checks.values()),
+        "checks": checks,
+        "payload": payload,
+        "process": result,
+    }
+
+
+def managed_marker_payload(env_path: Path, state: str, package_probe: dict[str, Any] | None = None) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "schema": "amd-nerfstudio-managed-env-v1",
+        "installer_version": VERSION,
+        "state": state,
+        "environment": str(env_path),
+        "python_major_minor": "3.12",
+        "created_at_utc": datetime.now(timezone.utc).isoformat(),
+        "build_package_pins": BUILD_PACKAGE_PINS,
+    }
+    if package_probe is not None:
+        payload["package_probe"] = package_probe
+    return payload
+
+
+def write_managed_marker(env_path: Path, state: str, package_probe: dict[str, Any] | None = None) -> Path:
+    marker = env_path / MANAGED_ENV_MARKER
+    marker.write_text(
+        json.dumps(managed_marker_payload(env_path, state, package_probe), indent=2, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    return marker
+
+
+def verify_managed_marker(env_path: Path) -> dict[str, Any]:
+    marker = env_path / MANAGED_ENV_MARKER
+    if not marker.is_file():
+        return {"passed": False, "path": str(marker), "reason": "MANAGED_ENV_MARKER_MISSING"}
+    try:
+        payload = json.loads(marker.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"passed": False, "path": str(marker), "reason": "MANAGED_ENV_MARKER_INVALID", "error": repr(exc)}
+    checks = {
+        "schema": payload.get("schema") == "amd-nerfstudio-managed-env-v1",
+        "environment": payload.get("environment") == str(env_path),
+        "state": payload.get("state") == "READY",
+    }
+    return {
+        "passed": all(checks.values()),
+        "path": str(marker),
+        "checks": checks,
+        "payload": payload,
+    }
+
+
+def install_build_packages(python: Path) -> dict[str, Any]:
+    argv = [
+        str(python), "-m", "pip", "install",
+        "--disable-pip-version-check",
+        "--no-input",
+        "--index-url", PYPI_INDEX,
+        *build_package_requirements(),
+    ]
+    env = dict(os.environ)
+    env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
+    install = run_command(argv, timeout=1800, env=env)
+    pip_check = run_command([str(python), "-m", "pip", "check"], timeout=300, env=env)
+    probe = probe_python_packages(python)
+    return {
+        "passed": install.get("returncode") == 0 and pip_check.get("returncode") == 0 and probe["passed"],
+        "requirements": build_package_requirements(),
+        "index": PYPI_INDEX,
+        "install": install,
+        "pip_check": pip_check,
+        "probe": probe,
+    }
+
+
+def prepare_environment(report: dict[str, Any]) -> dict[str, Any]:
+    if not report.get("passed"):
+        return {"passed": False, "status": "BLOCKED", "reason": "PREFLIGHT_NOT_PASSED"}
+
+    selection = report["environment_selection"]
+    env_path = Path(selection["path"])
+    python = env_path / "bin" / "python"
+    action = selection["action"]
+
+    if action == "CREATE_NEW_ENV":
+        if env_path.exists():
+            return {"passed": False, "status": "BLOCKED", "reason": "ENV_PATH_APPEARED_DURING_RUN"}
+        env_path.parent.mkdir(parents=True, exist_ok=True)
+        created = False
+        try:
+            creation = run_command([sys.executable, "-m", "venv", str(env_path)], timeout=600)
+            if creation.get("returncode") != 0:
+                return {
+                    "passed": False,
+                    "status": "FAIL",
+                    "reason": "VENV_CREATION_FAILED",
+                    "creation": creation,
+                }
+            created = True
+            write_managed_marker(env_path, "CREATING")
+            packages = install_build_packages(python)
+            if not packages["passed"]:
+                return {
+                    "passed": False,
+                    "status": "FAIL",
+                    "reason": "BUILD_PACKAGE_INSTALL_FAILED",
+                    "creation": creation,
+                    "packages": packages,
+                }
+            marker = write_managed_marker(env_path, "READY", packages["probe"])
+            return {
+                "passed": True,
+                "status": "READY",
+                "reason": "MANAGED_ENV_CREATED",
+                "created": True,
+                "reused": False,
+                "path": str(env_path),
+                "python": str(python),
+                "marker": str(marker),
+                "creation": creation,
+                "packages": packages,
+            }
+        finally:
+            if created and env_path.exists():
+                marker = env_path / MANAGED_ENV_MARKER
+                ready = False
+                if marker.is_file():
+                    try:
+                        ready = json.loads(marker.read_text(encoding="utf-8")).get("state") == "READY"
+                    except Exception:
+                        ready = False
+                if not ready:
+                    shutil.rmtree(env_path, ignore_errors=True)
+
+    if action == "REUSE_MANAGED_ENV":
+        marker = verify_managed_marker(env_path)
+        if not marker["passed"]:
+            return {
+                "passed": False,
+                "status": "BLOCKED",
+                "reason": "MANAGED_ENV_OWNERSHIP_UNVERIFIED",
+                "marker": marker,
+            }
+        packages = install_build_packages(python)
+        if not packages["passed"]:
+            return {
+                "passed": False,
+                "status": "FAIL",
+                "reason": "MANAGED_ENV_BUILD_PACKAGE_REFRESH_FAILED",
+                "created": False,
+                "reused": True,
+                "packages": packages,
+            }
+        marker_path = write_managed_marker(env_path, "READY", packages["probe"])
+        return {
+            "passed": True,
+            "status": "READY",
+            "reason": "MANAGED_ENV_REUSED",
+            "created": False,
+            "reused": True,
+            "path": str(env_path),
+            "python": str(python),
+            "marker": str(marker_path),
+            "packages": packages,
+        }
+
+    if action == "REUSE_EXISTING_ENV":
+        packages = probe_python_packages(python)
+        return {
+            "passed": packages["passed"],
+            "status": "READY" if packages["passed"] else "BLOCKED",
+            "reason": "EXPLICIT_ENV_BUILD_BASE_VERIFIED" if packages["passed"] else "EXPLICIT_ENV_BUILD_BASE_INCOMPLETE",
+            "created": False,
+            "reused": True,
+            "modified": False,
+            "path": str(env_path),
+            "python": str(python),
+            "packages": packages,
+        }
+
+    return {"passed": False, "status": "BLOCKED", "reason": f"UNSUPPORTED_ENV_ACTION:{action}"}
+
+
 def format_apt_command(packages: list[str]) -> str:
     ordered = [name for name in APT_PACKAGE_ORDER if name in packages]
     if not ordered:
@@ -335,7 +584,7 @@ def build_report(args: argparse.Namespace, script_path: Path) -> dict[str, Any]:
         "schema": SCHEMA,
         "version": VERSION,
         "passed": passed,
-        "mode": "PREFLIGHT_ONLY",
+        "mode": "ENV_PREPARATION" if args.prepare_env else "PREFLIGHT_ONLY",
         "paths": {key: str(value) for key, value in paths.items()},
         "platform_checks": platform_checks,
         "host_packages": packages,
@@ -424,6 +673,23 @@ def print_report_summary(report: dict[str, Any]) -> None:
     print("SYSTEM_MODIFIED: NO")
 
 
+def print_environment_preparation(result: dict[str, Any]) -> None:
+    print()
+    print("environment preparation:")
+    print(f"  status:  {result.get('status')}")
+    print(f"  reason:  {result.get('reason')}")
+    if result.get("path"):
+        print(f"  path:    {result.get('path')}")
+    if result.get("python"):
+        print(f"  python:  {result.get('python')}")
+    print(f"ENV_CREATED: {'YES' if result.get('created') else 'NO'}")
+    print(f"ENV_REUSED: {'YES' if result.get('reused') else 'NO'}")
+    print(f"PYTHON_BUILD_BASE: {'PASS' if result.get('passed') else 'FAIL'}")
+    print("SYSTEM_MODIFIED: NO")
+    workdir_modified = bool(result.get("created") or (result.get("reused") and result.get("modified", True)))
+    print(f"WORKDIR_MODIFIED: {'YES' if workdir_modified else 'NO'}")
+
+
 def self_test() -> int:
     failures: list[str] = []
     with tempfile.TemporaryDirectory() as td:
@@ -450,11 +716,17 @@ def self_test() -> int:
             failures.append("apt order")
         if "sudo apt install --no-install-recommends" not in command:
             failures.append("apt command")
+        requirements = build_package_requirements()
+        if requirements != [f"{name}=={version}" for name, version in BUILD_PACKAGE_PINS.items()]:
+            failures.append("build package requirements")
+        marker = managed_marker_payload(workdir / "venv", "READY")
+        if marker.get("schema") != "amd-nerfstudio-managed-env-v1":
+            failures.append("managed marker schema")
     payload = {
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 5,
+        "tests": 7,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")
@@ -462,13 +734,14 @@ def self_test() -> int:
 
 
 def parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(description="AMD Nerfstudio v1.5 path and host preflight")
+    p = argparse.ArgumentParser(description="AMD Nerfstudio v1.5 host preflight and managed environment preparation")
     p.add_argument("--workdir", type=Path)
     p.add_argument("--env", "--venv", dest="env", type=Path)
     p.add_argument("--rocm-path", type=Path, default=DEFAULT_ROCM_PATH)
     p.add_argument("--arch", default=SUPPORTED_ARCH)
     p.add_argument("--validation", choices=("none", "quick", "full"), default="quick")
     p.add_argument("--json-report", type=Path)
+    p.add_argument("--prepare-env", action="store_true", help="Create or refresh the installer-managed environment after a passing preflight")
     p.add_argument("--self-test", action="store_true")
     return p
 
@@ -483,11 +756,41 @@ def main() -> int:
     print_paths(paths, args.rocm_path, args.arch, args.validation)
     report = build_report(args, script_path)
     print_report_summary(report)
+
+    preparation: dict[str, Any] | None = None
+    if args.prepare_env:
+        print()
+        print("ENV_PREPARATION: START")
+        print("Pinned Python build base:")
+        for requirement in build_package_requirements():
+            print(f"  - {requirement}")
+        print("No sudo or apt commands will be executed.")
+        print()
+        preparation = prepare_environment(report)
+        report["environment_preparation"] = preparation
+        report["installation"] = {
+            "status": "ENV_READY" if preparation.get("passed") else preparation.get("status", "BLOCKED"),
+            "env_created": bool(preparation.get("created")),
+            "env_reused": bool(preparation.get("reused")),
+            "system_modified": False,
+            "workdir_modified": bool(preparation.get("created") or (preparation.get("reused") and preparation.get("modified", True))),
+            "automatic_sudo": False,
+            "automatic_apt": False,
+        }
+        print_environment_preparation(preparation)
+
+    output: Path | None = None
     if args.json_report is not None:
         output = absolute(args.json_report)
+    elif args.prepare_env:
+        output = Path(report["paths"]["reports"]) / "installer-v1.5-env-preparation.json"
+    if output is not None:
         output.parent.mkdir(parents=True, exist_ok=True)
         output.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
         print(f"REPORT_JSON: {output}")
+
+    if preparation is not None:
+        return 0 if preparation.get("passed") else 2
     return 0 if report["passed"] else 2
 
 
