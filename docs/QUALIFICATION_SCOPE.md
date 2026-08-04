@@ -37,3 +37,12 @@ The qualification does not establish:
 ## Interpretation rule
 
 A scoped PASS must not be broadened into a platform-wide claim. The project demonstrates technical feasibility and a qualified integration path, not official upstream support for all configurations.
+
+
+## v1.4.2 adaptive environment note
+
+The adaptive installer may reuse a compatible existing environment unchanged or
+create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
+dependency for `viser.transforms.SO3`; Viewer construction remains quarantined
+fail-closed, and `pyliblzfse` / `yourdfpy` remain outside the scoped contract.
+See `docs/PUBLIC_ADAPTIVE_ENV_V1.md`.

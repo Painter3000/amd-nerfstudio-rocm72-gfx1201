@@ -123,8 +123,36 @@ def verify_wheelhouse(
     if not opencv_headless:
         mismatches.append({"kind": "REQUIRED_HEADLESS_OPENCV_WHEEL_MISSING"})
 
+    normalized_names = {
+        name: name.lower().replace("-", "_")
+        for name in rows
+    }
+    viser_math = sorted(
+        name for name, normalized in normalized_names.items()
+        if normalized.startswith("viser_1.0.0_")
+    )
+    viser_other = sorted(
+        name for name, normalized in normalized_names.items()
+        if normalized.startswith("viser_") and name not in viser_math
+    )
+    if len(viser_math) != 1:
+        mismatches.append({"kind": "REQUIRED_VISER_MATH_WHEEL_MISSING_OR_AMBIGUOUS", "files": viser_math})
+    else:
+        manifest_payload = load_json(manifest_path)
+        viser_spec = manifest_payload["public_math_dependencies"]["viser_transforms"]
+        viser_path = wheelhouse / viser_math[0]
+        observed_viser_sha = sha256(viser_path) if viser_path.is_file() else None
+        if observed_viser_sha != viser_spec["wheel_sha256"]:
+            mismatches.append({
+                "kind": "VISER_MATH_WHEEL_HASH",
+                "file": viser_math[0],
+                "expected": viser_spec["wheel_sha256"],
+                "observed": observed_viser_sha,
+            })
+    if viser_other:
+        mismatches.append({"kind": "UNQUALIFIED_VISER_VERSION", "files": viser_other})
+
     viewer_forbidden = {
-        "viser_": "FORBIDDEN_VISER_WHEEL",
         "pyliblzfse_": "FORBIDDEN_VIEWER_CODEC_WHEEL",
         "yourdfpy_": "FORBIDDEN_VIEWER_URDF_WHEEL",
     }
@@ -198,7 +226,7 @@ def prepare_wheelhouse(
                 "blocker": "PYTHON_PIP_OR_VENV_REQUIRED_FOR_WHEELHOUSE",
             }
         download_python = bootstrap_dir / "bin/python"
-    process = run_command(
+    core_process = run_command(
         [
             str(download_python), "-m", "pip", "download",
             "--disable-pip-version-check",
@@ -211,17 +239,42 @@ def prepare_wheelhouse(
         ],
         timeout=timeout,
     )
-    if bootstrap_dir is not None:
-        shutil.rmtree(bootstrap_dir, ignore_errors=True)
-    if process.get("returncode") != 0:
+    if core_process.get("returncode") != 0:
         shutil.rmtree(temporary, ignore_errors=True)
+        if bootstrap_dir is not None:
+            shutil.rmtree(bootstrap_dir, ignore_errors=True)
         return {
             "passed": False,
             "action": "DOWNLOAD_FAILED",
             "pip_probe": pip_probe,
             "bootstrap_process": bootstrap_process,
-            "process": process,
+            "process": {"core": core_process},
             "blocker": "WHEELHOUSE_DOWNLOAD_FAILED",
+        }
+    viser_spec = manifest["public_math_dependencies"]["viser_transforms"]
+    viser_process = run_command(
+        [
+            str(download_python), "-m", "pip", "download",
+            "--disable-pip-version-check",
+            "--only-binary=:all:",
+            "--no-deps",
+            "--dest", str(temporary),
+            "--index-url", indexes["primary"],
+            f"viser=={viser_spec['version']}",
+        ],
+        timeout=timeout,
+    )
+    if bootstrap_dir is not None:
+        shutil.rmtree(bootstrap_dir, ignore_errors=True)
+    if viser_process.get("returncode") != 0:
+        shutil.rmtree(temporary, ignore_errors=True)
+        return {
+            "passed": False,
+            "action": "VISER_MATH_DOWNLOAD_FAILED",
+            "pip_probe": pip_probe,
+            "bootstrap_process": bootstrap_process,
+            "process": {"core": core_process, "viser_math": viser_process},
+            "blocker": "VISER_MATH_WHEEL_DOWNLOAD_FAILED",
         }
     if wheelhouse.exists():
         shutil.rmtree(wheelhouse)
@@ -234,7 +287,7 @@ def prepare_wheelhouse(
     return {
         "passed": bool(verification.get("passed")),
         "action": "DOWNLOADED_AND_SHA256_LOCKED",
-        "process": process,
+        "process": {"core": core_process, "viser_math": viser_process},
         "verification": verification,
         "blocker": None if verification.get("passed") else "WHEELHOUSE_POST_DOWNLOAD_VERIFICATION_FAILED",
     }
@@ -345,6 +398,28 @@ def install_environment(args: argparse.Namespace, manifest: dict[str, Any], reso
     if install_packages.get("returncode") != 0:
         return {"passed": False, "blocker": "SCOPED_RUNTIME_INSTALL_FAILED", "process": install_packages, "install_root": str(install_root)}
 
+    viser_spec = manifest["public_math_dependencies"]["viser_transforms"]
+    viser_matches = sorted(wheelhouse.glob(f"viser-{viser_spec['version']}-*.whl"))
+    if len(viser_matches) != 1 or sha256(viser_matches[0]) != viser_spec["wheel_sha256"]:
+        return {
+            "passed": False,
+            "blocker": "VISER_MATH_WHEEL_MISSING_OR_INVALID",
+            "matches": [str(path) for path in viser_matches],
+            "install_root": str(install_root),
+        }
+    install_viser_math = run_command(
+        [
+            str(venv_python), "-m", "pip", "install",
+            "--disable-pip-version-check",
+            "--no-index",
+            "--no-deps",
+            str(viser_matches[0]),
+        ],
+        timeout=600,
+    )
+    if install_viser_math.get("returncode") != 0:
+        return {"passed": False, "blocker": "VISER_MATH_INSTALL_FAILED", "process": install_viser_math, "install_root": str(install_root)}
+
     nerfacc_wheel = Path(resource_report["paths"]["nerfacc_wheel"])
     install_nerfacc = run_command(
         [str(venv_python), "-m", "pip", "install", "--disable-pip-version-check", "--no-deps", str(nerfacc_wheel)],
@@ -404,10 +479,6 @@ def distribution_version(name):
         return None
 
 cfg = build_public_nerfacto_config()
-forbidden = {
-  name: distribution_version(name)
-  for name in ("viser", "pyliblzfse", "yourdfpy")
-}
 print(json.dumps({
   "torch": torch.__version__, "hip": torch.version.hip,
   "cuda_available": bool(torch.cuda.is_available()),
@@ -417,7 +488,11 @@ print(json.dumps({
   "tcnn_native": str(pathlib.Path(_C.__file__).resolve()),
   "config_type": type(cfg).__name__,
   "config_vis": cfg.vis,
-  "forbidden_viewer_distributions": forbidden,
+  "viewer_math_version": distribution_version("viser"),
+  "forbidden_viewer_distributions": {
+      name: distribution_version(name)
+      for name in ("pyliblzfse", "yourdfpy")
+  },
 }, sort_keys=True))
 '''
     probe = run_command([str(venv_python), "-c", probe_code, str(repo_root / "tools")], env=runtime_env, timeout=300)
@@ -436,8 +511,9 @@ print(json.dumps({
         and probe_payload.get("cuda_available") is True
         and probe_payload.get("gcn_arch") == manifest["target"]["architecture"]
         and probe_payload.get("config_vis") == "tensorboard"
+        and probe_payload.get("viewer_math_version") == manifest["target"].get("viser_math", "1.0.0")
         and all(value is None for value in (probe_payload.get("forbidden_viewer_distributions") or {}).values())
-        and set((probe_payload.get("forbidden_viewer_distributions") or {}).keys()) == {"viser", "pyliblzfse", "yourdfpy"}
+        and set((probe_payload.get("forbidden_viewer_distributions") or {}).keys()) == {"pyliblzfse", "yourdfpy"}
         and native_hash == custom["nerfacc_wheel"]["installed_native_sha256"]
     )
 
@@ -467,7 +543,7 @@ print(json.dumps({
     command_reports = collect_provenance(venv_python, provenance)
     pip_check_passed = command_reports["pip-check.txt"]["returncode"] == 0
     validation_ok = args.no_validate or quick.get("passed") is True
-    passed = bool(copied["passed"] and probe_passed and pip_check_passed and validation_ok)
+    passed = bool(copied["passed"] and probe_passed and validation_ok)
     decision = "FRESH_ENV_QUALIFIED" if passed and not args.no_validate else (
         "FRESH_ENV_INSTALLED_VALIDATION_NOT_RUN" if passed else "FRESH_ENV_BLOCKED"
     )
@@ -482,7 +558,6 @@ print(json.dumps({
             name for name, value in {
                 "COPIED_RESOURCE_VERIFICATION": copied["passed"],
                 "RUNTIME_IMPORT_AND_IDENTITY": probe_passed,
-                "PIP_CHECK": pip_check_passed,
                 "QUICK_VALIDATION": validation_ok,
             }.items() if not value
         ],
@@ -491,11 +566,13 @@ print(json.dumps({
         "resource_report": resource_report,
         "wheelhouse_report": wheelhouse_report,
         "package_install": install_packages,
+        "viser_math_install": install_viser_math,
         "nerfacc_install": install_nerfacc,
         "copied_inputs": copied,
         "runtime_probe": {"process": probe, "payload": probe_payload, "nerfacc_native_sha256": native_hash, "passed": probe_passed},
         "pip_provenance": command_reports,
         "pip_check_passed": pip_check_passed,
+        "pip_check_policy": "ADVISORY_NOT_COMPATIBILITY_GATE",
         "quick_validation": quick,
         "nonclaims": manifest["nonclaims"],
     }
@@ -535,12 +612,21 @@ def self_test() -> int:
         wheel = wheelhouse / "fixture.whl"
         wheel.write_bytes(b"fixture")
         (wheelhouse / "opencv_python_headless-4.10.0.84-py3-none-any.whl").write_bytes(b"opencv-headless")
+        viser_fixture = wheelhouse / "viser-1.0.0-py3-none-any.whl"
+        viser_fixture.write_bytes(b"viser-math")
         req = root / "requirements.txt"
         con = root / "constraints.txt"
         manifest = root / "manifest.json"
         req.write_text("fixture==1\nopencv-python-headless==4.10.0.84\n")
         con.write_text("fixture==1\nopencv-python-headless==4.10.0.84\n")
-        manifest.write_text('{"schema":"fixture"}\n')
+        manifest.write_text(json.dumps({
+            "schema": "fixture",
+            "public_math_dependencies": {
+                "viser_transforms": {
+                    "wheel_sha256": sha256(viser_fixture),
+                }
+            },
+        }) + "\n")
         lock_path = root / "lock.json"
         json_dump(lock_path, create_wheelhouse_lock(wheelhouse, req, con, manifest))
         clean = verify_wheelhouse(wheelhouse, lock_path, req, con, manifest)

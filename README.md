@@ -136,6 +136,7 @@ Not claimed:
 - [Public Toolchain v1 tool hashes](evidence-public/PUBLIC_TOOLCHAIN_V1_TOOL_SHA256SUMS.txt)
 - [Public quick-validation reference replay](evidence-public/PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md)
 - [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md)
+- [Public adaptive environment v1](docs/PUBLIC_ADAPTIVE_ENV_V1.md)
 - [Resource-cache policy](resources/README.md)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
@@ -207,3 +208,31 @@ Public Toolchain v1.3.2 has passed static self-tests and repository-tree audit a
 Original helper scripts and documentation added by this repository are covered by the repository license. Third-party projects retain their own licenses and are not relicensed here.
 
 This is an independent community project and is not an official AMD, Nerfstudio, PyTorch, or NVIDIA repository.
+
+
+### Public Toolchain v1.4.2 adaptive environment
+
+The normal entry point can now reuse an already compatible Python 3.12 venv,
+Conda environment, or explicitly selected interpreter without mutating it. If
+reuse is not possible, `auto` can delegate to the pinned Fresh-ENV installer for
+a new isolated environment:
+
+```bash
+scripts/setup_public_adaptive_env_v1.sh \
+  --env /path/to/selected/environment \
+  --resource-dir "$PWD/resource-cache-v1" \
+  --install-root "$PWD/rdna4-nerfacto-env" \
+  --quick
+```
+
+`pip check` is advisory for an existing shared environment; P0+P1 is the scoped
+functional gate. `--repair` creates an isolated replacement and never changes
+the candidate in place. The Viewer policy now pins `viser==1.0.0` only for
+`viser.transforms.SO3`; Viewer construction remains fail-closed.
+
+The environment is always selected explicitly. The installer does not search the
+disk and does not silently fall back to system Python. Existing environments use
+`ENV_ROOT/bin/python`; isolated fallback still requires an explicit
+`--install-root`.
+
+See [Public adaptive environment v1](docs/PUBLIC_ADAPTIVE_ENV_V1.md).

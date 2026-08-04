@@ -1,14 +1,15 @@
 {
   "schema": "amd-nerfstudio-public-fresh-env-resources-v1",
   "profile": "reference-binary-fresh-env",
-  "scope": "NERFACTO_TRAINING_CHAIN_NOT_FULL_NERFSTUDIO",
+  "scope": "NERFACTO_TRAINING_CHAIN_VIEWER_RUNTIME_DISABLED",
   "target": {
     "architecture": "gfx1201",
     "hip": "7.2.53211",
     "operating_system": "Ubuntu 24.04",
     "python_major_minor": "3.12",
     "torch": "2.13.0+rocm7.2",
-    "torchvision": "0.28.0+rocm7.2"
+    "torchvision": "0.28.0+rocm7.2",
+    "viser_math": "1.0.0"
   },
   "network_policy": {
     "default": "PROMPT_BEFORE_NETWORK",
@@ -73,5 +74,16 @@
     "FULL_NERFSTUDIO_FEATURE_COVERAGE",
     "CROSS_TIME_PYPI_RESOLUTION_IDENTITY_BEFORE_A_PUBLISHED_WHEELHOUSE_LOCK",
     "VMM_FALLBACK_PERFORMANCE_PARITY"
-  ]
+  ],
+  "public_math_dependencies": {
+    "viser_transforms": {
+      "distribution": "viser",
+      "version": "1.0.0",
+      "wheel_filename": "viser-1.0.0-py3-none-any.whl",
+      "wheel_sha256": "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb",
+      "install_mode": "NO_DEPS_MATH_ONLY",
+      "allowed_surface": "viser.transforms",
+      "viewer_construction": "FAIL_CLOSED"
+    }
+  }
 }

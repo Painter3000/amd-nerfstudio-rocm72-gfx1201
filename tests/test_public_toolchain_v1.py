@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 from __future__ import annotations
 
+import argparse
 import ast
 import hashlib
 import json
@@ -16,6 +17,7 @@ sys.path.insert(0, str(TOOLS))
 
 import run_public_a5p1_nerfacto_smoke_v1 as p1_tool
 import setup_public_fresh_env_v1 as fresh_env_tool
+import setup_public_adaptive_env_v1 as adaptive_env_tool
 
 
 class PublicToolchainSelfTests(unittest.TestCase):
@@ -202,6 +204,8 @@ class PublicToolchainSelfTests(unittest.TestCase):
         self.assertIn("torchvision==0.28.0+rocm7.2", requirements)
         for excluded in ["gsplat", "open3d", "jupyterlab", "wandb", "comet-ml", "nuscenes-devkit", "viser", "pyliblzfse", "yourdfpy"]:
             self.assertNotIn(excluded, requirements)
+        self.assertEqual("1.0.0", manifest["target"]["viser_math"])
+        self.assertEqual("NO_DEPS_MATH_ONLY", manifest["public_math_dependencies"]["viser_transforms"]["install_mode"])
 
     def test_fresh_env_contract_is_viewer_free(self):
         requirements = (ROOT / "requirements/nerfacto_runtime_v1.txt").read_text(encoding="utf-8").lower()
@@ -210,6 +214,10 @@ class PublicToolchainSelfTests(unittest.TestCase):
         for forbidden in ["viser", "pyliblzfse", "yourdfpy"]:
             self.assertNotIn(forbidden, requirements)
             self.assertNotIn(forbidden, constraints)
+        installer = (ROOT / "tools/setup_public_fresh_env_v1.py").read_text(encoding="utf-8")
+        self.assertIn('viser=={viser_spec', installer)
+        self.assertIn('"--no-deps"', installer)
+        self.assertIn("VISER_MATH_WHEEL_HASH", installer)
         self.assertIn('vis="tensorboard"', builder)
         self.assertIn("install_viewer_free_import_quarantine", builder)
         self.assertIn("VISER_VIEWER_DISABLED_BY_PUBLIC_P0_P1_CONTRACT", builder)
@@ -356,31 +364,46 @@ print('VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS')
             requirements = root / "requirements.txt"
             constraints = root / "constraints.txt"
             manifest = root / "manifest.json"
-            requirements.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
-            constraints.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
-            manifest.write_text("{}\n", encoding="utf-8")
+            requirements.write_text("opencv-python-headless==4.10.0.84\nviser==1.0.0\n", encoding="utf-8")
+            constraints.write_text("opencv-python-headless==4.10.0.84\nviser==1.0.0\n", encoding="utf-8")
+            manifest.write_text(json.dumps({
+                "public_math_dependencies": {
+                    "viser_transforms": {
+                        "wheel_sha256": "0" * 64,
+                    }
+                }
+            }) + "\n", encoding="utf-8")
             lock_path = root / "lock.json"
             lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")
             report = fresh_env_tool.verify_wheelhouse(wheelhouse, lock_path, requirements, constraints, manifest)
             self.assertFalse(report["passed"])
             kinds = {row["kind"] for row in report["mismatches"]}
-            self.assertIn("FORBIDDEN_VISER_WHEEL", kinds)
+            self.assertIn("REQUIRED_VISER_MATH_WHEEL_MISSING_OR_AMBIGUOUS", kinds)
+            self.assertIn("UNQUALIFIED_VISER_VERSION", kinds)
             self.assertIn("FORBIDDEN_VIEWER_CODEC_WHEEL", kinds)
             self.assertIn("FORBIDDEN_VIEWER_URDF_WHEEL", kinds)
 
-    def test_wheelhouse_accepts_headless_opencv_without_viewer(self):
+    def test_wheelhouse_accepts_headless_opencv_with_math_only_viser(self):
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             wheelhouse = root / "wheelhouse"
             wheelhouse.mkdir()
             name = "opencv_python_headless-4.10.0.84-py3-none-any.whl"
             (wheelhouse / name).write_bytes(name.encode("utf-8"))
+            viser_name = "viser-1.0.0-py3-none-any.whl"
+            (wheelhouse / viser_name).write_bytes(viser_name.encode("utf-8"))
             requirements = root / "requirements.txt"
             constraints = root / "constraints.txt"
             manifest = root / "manifest.json"
             requirements.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
             constraints.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
-            manifest.write_text("{}\n", encoding="utf-8")
+            manifest.write_text(json.dumps({
+                "public_math_dependencies": {
+                    "viser_transforms": {
+                        "wheel_sha256": hashlib.sha256((wheelhouse / viser_name).read_bytes()).hexdigest(),
+                    }
+                }
+            }) + "\n", encoding="utf-8")
             lock_path = root / "lock.json"
             lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")
             report = fresh_env_tool.verify_wheelhouse(wheelhouse, lock_path, requirements, constraints, manifest)
@@ -394,6 +417,7 @@ print('VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS')
             for name in [
                 "opencv_python_headless-4.10.0.84-py3-none-any.whl",
                 "opencv_python-4.14.0.94-py3-none-any.whl",
+                "viser-1.0.0-py3-none-any.whl",
             ]:
                 (wheelhouse / name).write_bytes(name.encode("utf-8"))
             requirements = root / "requirements.txt"
@@ -401,7 +425,14 @@ print('VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS')
             manifest = root / "manifest.json"
             requirements.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
             constraints.write_text("opencv-python-headless==4.10.0.84\n", encoding="utf-8")
-            manifest.write_text("{}\n", encoding="utf-8")
+            viser_path = wheelhouse / "viser-1.0.0-py3-none-any.whl"
+            manifest.write_text(json.dumps({
+                "public_math_dependencies": {
+                    "viser_transforms": {
+                        "wheel_sha256": hashlib.sha256(viser_path.read_bytes()).hexdigest(),
+                    }
+                }
+            }) + "\n", encoding="utf-8")
             lock_path = root / "lock.json"
             lock_path.write_text(json.dumps(fresh_env_tool.create_wheelhouse_lock(wheelhouse, requirements, constraints, manifest)), encoding="utf-8")
             report = fresh_env_tool.verify_wheelhouse(wheelhouse, lock_path, requirements, constraints, manifest)
@@ -409,6 +440,42 @@ print('VIEWER_TRANSFORMS_BRIDGE_REGRESSION: PASS')
             kinds = {row["kind"] for row in report["mismatches"]}
             self.assertIn("DUPLICATE_CV2_DISTRIBUTION_PROVIDERS", kinds)
             self.assertIn("FORBIDDEN_GUI_OPENCV_WHEEL", kinds)
+
+
+    def test_adaptive_env_installer_self_test(self):
+        self.assertTrue(self.run_self_test("setup_public_adaptive_env_v1.py")["passed"])
+
+    def test_adaptive_env_never_repairs_candidate_in_place(self):
+        ns = argparse.Namespace(
+            env_policy="auto",
+            no_build=False,
+            install_root=Path("/isolated/new-env"),
+            resource_dir=Path("/verified/cache"),
+            repair=True,
+        )
+        plan = adaptive_env_tool.choose_action(ns, compatible=False)
+        self.assertEqual("CREATE_NEW_ENV", plan["action"])
+        self.assertEqual("SAFE_REPAIR_BY_ISOLATED_REPLACEMENT", plan["reason"])
+
+    def test_adaptive_wrapper_and_docs_exist(self):
+        self.assertTrue((ROOT / "scripts/setup_public_adaptive_env_v1.sh").is_file())
+        self.assertTrue((ROOT / "docs/PUBLIC_ADAPTIVE_ENV_V1.md").is_file())
+        source = (ROOT / "tools/setup_public_adaptive_env_v1.py").read_text(encoding="utf-8")
+        wrapper = (ROOT / "scripts/setup_public_adaptive_env_v1.sh").read_text(encoding="utf-8")
+        self.assertTrue(source.startswith("#!/usr/bin/env python3\n"))
+        self.assertIn("ADVISORY_NOT_COMPATIBILITY_GATE", source)
+        self.assertIn("p2_execution=NOT_RUN", source)
+        self.assertIn("--env", source)
+        self.assertIn("disk_environment_search", source)
+        self.assertIn("set -euo pipefail", wrapper)
+        self.assertIn("trap on_error ERR", wrapper)
+        self.assertNotIn("exec ", wrapper)
+
+    def test_explicit_env_maps_to_its_own_python(self):
+        self.assertEqual(
+            Path("/chosen/environment/bin/python"),
+            adaptive_env_tool.python_from_env_root(Path("/chosen/environment")),
+        )
 
     def test_resource_manager_self_test(self):
         self.assertTrue(self.run_self_test("manage_public_resources_v1.py")["passed"])

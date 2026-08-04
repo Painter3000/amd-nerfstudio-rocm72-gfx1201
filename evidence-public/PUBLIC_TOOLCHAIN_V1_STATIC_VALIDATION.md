@@ -129,3 +129,12 @@ Static fixtures verify that:
 
 A real R9700 Fresh-ENV GPU execution remains `NOT_RUN` until the corrected external
 wheelhouse is rebuilt and the offline install completes P0+P1.
+
+
+## v1.4.2 adaptive environment note
+
+The adaptive installer receives the candidate explicitly through `--env ENV_ROOT` or `--python PYTHON`. No disk-wide environment search or silent system-Python fallback is allowed. It may reuse a compatible existing environment unchanged or
+create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
+dependency for `viser.transforms.SO3`; Viewer construction remains quarantined
+fail-closed, and `pyliblzfse` / `yourdfpy` remain outside the scoped contract.
+See `docs/PUBLIC_ADAPTIVE_ENV_V1.md`.

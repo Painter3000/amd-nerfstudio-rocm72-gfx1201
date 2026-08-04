@@ -176,3 +176,12 @@ The `reference-binary-fresh-env` installer is documented in
 `PUBLIC_FRESH_ENV_V1.md`. It creates a new Python environment but deliberately
 reuses the exact qualified native artifacts. P2 remains maintainer-only and is
 never called by setup or quick validation.
+
+
+## v1.4.2 adaptive environment note
+
+The adaptive installer receives the candidate explicitly through `--env ENV_ROOT` or `--python PYTHON`. No disk-wide environment search or silent system-Python fallback is allowed. It may reuse a compatible existing environment unchanged or
+create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
+dependency for `viser.transforms.SO3`; Viewer construction remains quarantined
+fail-closed, and `pyliblzfse` / `yourdfpy` remain outside the scoped contract.
+See `docs/PUBLIC_ADAPTIVE_ENV_V1.md`.
