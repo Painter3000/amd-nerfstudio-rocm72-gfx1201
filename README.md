@@ -137,6 +137,8 @@ Not claimed:
 - [Public quick-validation reference replay](evidence-public/PUBLIC_QUICK_VALIDATION_REFERENCE_REPLAY.md)
 - [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md)
 - [Public adaptive environment v1](docs/PUBLIC_ADAPTIVE_ENV_V1.md)
+- [Adaptive installer v1.4.3 P0+P1 qualification](evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION.md)
+- [Adaptive installer v1.4.3 evidence hashes](evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_EVIDENCE_SHA256SUMS.txt)
 - [Resource-cache policy](resources/README.md)
 - [Frozen A5 hashes](evidence-public/A5_FREEZE_SHA256SUMS.txt)
 
@@ -194,6 +196,26 @@ See [Public fresh environment v1](docs/PUBLIC_FRESH_ENV_V1.md).
 ### Publication state
 
 Public Toolchain v1.3.2 has passed static self-tests and repository-tree audit as an installer candidate. The v1.2 neutral-directory P0+P1 reference-runtime replay has passed. A real fresh-environment GPU execution of v1.3.2 remains the next qualification gate and is not claimed until that run succeeds.
+
+<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
+### Public Toolchain v1.4.3 qualified adaptive existing environment
+
+Public Toolchain v1.4.3 has completed a real R9700 adaptive-reuse qualification
+against implementation commit `8104a4c6cce4b45cc7fd92d50cd9a8b2699e8a0f` and tree `9cd8f5e389899fca64b6c1e65d3c81b2ce825178`.
+The explicitly selected environment was reused unchanged, `pip freeze` remained
+identical, the runtime/provenance gates passed, and the short public P0+P1
+Nerfacto GPU validation passed. P2 and long-duration training were not run.
+
+```text
+ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION_FREEZE: PASS
+EXISTING_ENV_REUSED_AND_QUALIFIED: PASS
+PUBLIC_RDNA4_QUICK_VALIDATION: PASS
+P2_EXECUTION: NOT_RUN
+FRESH_ENV_GPU_EXECUTION: NOT_RUN
+```
+
+See [the sanitized qualification evidence](evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION.md).
+<!-- END ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
 
 ## Related projects
 

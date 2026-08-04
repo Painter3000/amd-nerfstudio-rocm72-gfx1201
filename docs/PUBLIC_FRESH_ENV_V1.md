@@ -214,3 +214,12 @@ create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
 dependency for `viser.transforms.SO3`; Viewer construction remains quarantined
 fail-closed, and `pyliblzfse` / `yourdfpy` remain outside the scoped contract.
 See `docs/PUBLIC_ADAPTIVE_ENV_V1.md`.
+
+<!-- BEGIN ADAPTIVE_REUSE_DOES_NOT_QUALIFY_FRESH_ENV -->
+## Relationship to the v1.4.3 adaptive qualification
+
+The successful v1.4.3 adaptive reuse qualification does not qualify this
+Fresh-ENV creation path. Fresh-ENV keeps its stricter wheelhouse policy and
+remains `GPU_EXECUTION: NOT_RUN` until a separately created environment passes
+the real P0+P1 validation.
+<!-- END ADAPTIVE_REUSE_DOES_NOT_QUALIFY_FRESH_ENV -->

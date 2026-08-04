@@ -185,3 +185,14 @@ create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
 dependency for `viser.transforms.SO3`; Viewer construction remains quarantined
 fail-closed, and `pyliblzfse` / `yourdfpy` remain outside the scoped contract.
 See `docs/PUBLIC_ADAPTIVE_ENV_V1.md`.
+
+<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_TOOLCHAIN_QUALIFICATION -->
+## v1.4.3 adaptive existing-environment qualification
+
+A real adaptive reuse run passed on the pinned R9700 / `gfx1201` stack. The
+candidate environment was explicitly selected and reused without mutation; the
+runtime, provenance, P0, P1, checkpoint-policy, and manifest-chain gates passed.
+P2 remained maintainer-only and was not launched.
+
+See `evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION.md` for the sanitized freeze summary and public hashes.
+<!-- END ADAPTIVE_INSTALLER_V1_4_3_TOOLCHAIN_QUALIFICATION -->

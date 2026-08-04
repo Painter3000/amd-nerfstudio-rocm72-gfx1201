@@ -7,6 +7,16 @@
 - retain fail-closed Viewer construction, exact runtime identities, immutable `pip freeze`, and real P0+P1 as the reuse qualification gates;
 - add self-test and unit regression coverage proving advisory package observations do not block an otherwise qualified shared environment.
 
+<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_QUALIFICATION_FREEZE -->
+### Qualification freeze
+
+- qualify the explicit existing-environment reuse path on AMD RDNA4 / `gfx1201` without mutating the selected environment;
+- pass the real public P0 preflight and P1 Nerfacto mechanics, checkpoint policy, and manifest chain;
+- record `pip freeze` as unchanged and preserve shared-environment extras as advisories;
+- freeze implementation commit `8104a4c6cce4b45cc7fd92d50cd9a8b2699e8a0f` and tree `9cd8f5e389899fca64b6c1e65d3c81b2ce825178`;
+- publish sanitized evidence and SHA-256 anchors while keeping P2 and long-duration training `NOT_RUN`.
+<!-- END ADAPTIVE_INSTALLER_V1_4_3_QUALIFICATION_FREEZE -->
+
 ## v1.4.2 - Explicit environment routing and apply validation fix
 
 - make the adaptive shell wrapper use the exact `set -euo pipefail` form required by the existing public-tree audit;

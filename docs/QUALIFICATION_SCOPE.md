@@ -46,3 +46,12 @@ create a new isolated Fresh-ENV. `viser==1.0.0` is now the qualified math-only
 dependency for `viser.transforms.SO3`; Viewer construction remains quarantined
 fail-closed, and `pyliblzfse` / `yourdfpy` remain outside the scoped contract.
 See `docs/PUBLIC_ADAPTIVE_ENV_V1.md`.
+
+<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_SCOPE -->
+## Adaptive installer qualification boundary
+
+The v1.4.3 public qualification covers only the explicit existing-environment
+reuse path and the short real P0+P1 Nerfacto GPU validation. It does not extend
+the claim to Fresh-ENV creation, P2 sustained training, Viewer operation,
+Splatfacto, full Nerfstudio support, or performance claims.
+<!-- END ADAPTIVE_INSTALLER_V1_4_3_SCOPE -->

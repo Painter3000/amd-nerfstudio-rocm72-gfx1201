@@ -108,3 +108,22 @@ PUBLIC_RDNA4_ADAPTIVE_ENV: PASS
 ```
 
 Every run writes `final_aggregate.json`, `final_gate.txt`, and `MANIFEST.json`.
+
+<!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_REAL_QUALIFICATION -->
+## Public R9700 qualification
+
+The explicit existing-environment reuse path is qualified by freeze `20260804T073046Z_adaptive_installer_v1.4.3_p0_p1`.
+The selected environment was reused unchanged, `pip freeze` remained identical,
+runtime and provenance checks passed, and the real public P0+P1 quick validation
+passed. P2 and long-duration training were not run.
+
+```text
+Implementation commit: 8104a4c6cce4b45cc7fd92d50cd9a8b2699e8a0f
+Implementation tree:   9cd8f5e389899fca64b6c1e65d3c81b2ce825178
+EXISTING_ENV_REUSED_AND_QUALIFIED: PASS
+PUBLIC_RDNA4_QUICK_VALIDATION: PASS
+P2_EXECUTION: NOT_RUN
+```
+
+The sanitized public evidence is stored in `evidence-public/ADAPTIVE_INSTALLER_V1_4_3_P0_P1_QUALIFICATION.md`.
+<!-- END ADAPTIVE_INSTALLER_V1_4_3_REAL_QUALIFICATION -->
