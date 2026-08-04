@@ -1,0 +1,102 @@
+{
+  "schema": "amd-nerfstudio-public-installer-resources-v1-5",
+  "version": "1.5.0-dev1",
+  "scope": "EMPTY_DIRECTORY_OR_EXPLICIT_ENV_INSTALLER_FOR_GFX1201",
+  "target": {
+    "architecture": "gfx1201",
+    "python_major_minor": "3.12",
+    "torch": "2.13.0+rocm7.2",
+    "torchvision": "0.28.0+rocm7.2",
+    "hip": "7.2.53211",
+    "rocm_default_path": "/opt/rocm",
+    "viser_math": "1.0.0"
+  },
+  "path_contract": {
+    "workdir_default": "INSTALLER_DIRECTORY_UNLESS_RUNNING_FROM_PROJECT_REPOSITORY",
+    "managed_env": "venv",
+    "project_repository": "amd-nerfstudio-rocm72-gfx1201",
+    "nerfstudio_source": "sources/nerfstudio",
+    "tiny_rdna4_source": "sources/tiny-rdna4-nn",
+    "tiny_rdna4_build": "build/tiny-rdna4-nn",
+    "tiny_rdna4_runtime": "runtime/tiny-rdna4-nn",
+    "dataset": "datasets/quick-validation-dataset-v2",
+    "cache": "cache",
+    "reports": "reports",
+    "logs": "logs"
+  },
+  "environment_policy": {
+    "explicit_env_priority": true,
+    "managed_env_search_path": "venv",
+    "scan_other_directories": false,
+    "repair_external_env_in_place": false,
+    "create_managed_env_when_missing": true
+  },
+  "privilege_policy": {
+    "root_execution": "BLOCKED",
+    "automatic_sudo": false,
+    "automatic_apt": false,
+    "missing_host_packages": "PRINT_COMMAND_AND_EXIT_BLOCKED"
+  },
+  "host_packages": [
+    "build-essential",
+    "cmake",
+    "ninja-build",
+    "git",
+    "pkg-config",
+    "python3.12",
+    "python3.12-venv",
+    "python3.12-dev",
+    "ca-certificates",
+    "curl",
+    "tar",
+    "gzip",
+    "unzip"
+  ],
+  "nerfstudio_source": {
+    "url": "https://github.com/nerfstudio-project/nerfstudio.git",
+    "commit": "50e0e3c70c775e89333256213363badbf074f29d",
+    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e"
+  },
+  "nerfacc_wheel": {
+    "filename": "nerfacc-0.5.2-cp312-cp312-linux_x86_64.whl",
+    "sha256": "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00",
+    "installed_native_relative_path": "nerfacc/csrc.so",
+    "installed_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
+    "release_asset_url": null,
+    "availability": "V1_5_RELEASE_ASSET_PENDING"
+  },
+  "tiny_rdna4_nn": {
+    "url": "https://github.com/Painter3000/tiny-rdna4-nn.git",
+    "tag": "phase4a2-model-b-public-gfx1201-pass",
+    "commit": null,
+    "commit_lock_status": "PENDING_EXACT_TAG_COMMIT_LOCK",
+    "clone_mode": "RECURSIVE",
+    "build_mode": "LOCAL_NATIVE_SOURCE_BUILD",
+    "python_extension_glob": "tinycudann_bindings/_120_C.cpython-312-x86_64-linux-gnu.so",
+    "fixed_output_sha256_required": false,
+    "required_attestation": [
+      "SOURCE_TAG_AND_COMMIT",
+      "SUBMODULE_GITLINKS",
+      "GFX1201_CODE_OBJECT",
+      "PYTHON_IMPORT",
+      "GPU_RUNTIME_SMOKE",
+      "LOCAL_SHA256_RECORD"
+    ]
+  },
+  "quick_validation_dataset_v2": {
+    "repository_relative_path": "assets/quick-validation-dataset-v2",
+    "release_filename": "quick-validation-dataset-v2.tar.gz",
+    "release_asset_url": null,
+    "archive_sha256": "0a968da041884f1f815bc9176aef1a13dc72beb7531e25c5c98cf24db1db25ac",
+    "transforms_sha256": "38004443c9c89e44e2cb66457d949c183189d914caf4a10c0dfa81a095727807",
+    "provenance_sha256": "915a2d6c125606c655c5bdb096bf685fba37d2f3175767e37306f9a7998329e4",
+    "manifest_sha256": "c65f1858a7d5ccfd5ed8fc453e1230cab9c588837b5f045c613c8ec36fd15746"
+  },
+  "implementation_stage": {
+    "stage": "PATH_AND_HOST_PREFLIGHT",
+    "network_downloads": "NOT_IMPLEMENTED",
+    "env_creation": "NOT_IMPLEMENTED",
+    "native_build": "NOT_IMPLEMENTED",
+    "p0_p1": "NOT_IMPLEMENTED"
+  }
+}
