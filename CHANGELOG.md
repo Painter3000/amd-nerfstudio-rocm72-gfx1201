@@ -17,6 +17,17 @@
 - publish sanitized evidence and SHA-256 anchors while keeping P2 and long-duration training `NOT_RUN`.
 <!-- END ADAPTIVE_INSTALLER_V1_4_3_QUALIFICATION_FREEZE -->
 
+<!-- BEGIN README_EXPLAINER_CLARIFICATION -->
+### Reader-facing scope clarification
+
+- add an introductory explanation of Nerfstudio, neural scene reconstruction,
+  and the practical distinction from measurement-oriented photogrammetry;
+- explain the P0, P1, and P2 validation stages for normal users;
+- clarify that canonical A5-P2 is already frozen as `PASS`, while
+  `P2_SUSTAINED_VALIDATION: NOT_RUN` refers only to the later public Adaptive
+  Installer v1.4.3 P0+P1 requalification.
+<!-- END README_EXPLAINER_CLARIFICATION -->
+
 ## v1.4.2 - Explicit environment routing and apply validation fix
 
 - make the adaptive shell wrapper use the exact `set -euo pipefail` form required by the existing public-tree audit;

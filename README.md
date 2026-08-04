@@ -2,6 +2,145 @@
 
 Community integration, qualification and reproducibility project for running the **Nerfacto training chain from Nerfstudio** on AMD RDNA4 / `gfx1201` with ROCm 7.2, PyTorch ROCm, `tiny-rdna4-nn`, and a ROCm-compatible `nerfacc` runtime.
 
+<!-- BEGIN NERFSTUDIO_EXPLAINER_AND_VALIDATION_STAGES -->
+## What Is Nerfstudio — and Why Does This Repository Exist?
+
+Nerfstudio is not a traditional photogrammetry application. Instead of
+primarily measuring hard 3D geometry, it uses AI methods such as **Neural
+Radiance Fields (NeRFs)** and graphics techniques such as **Gaussian
+Splatting** to reconstruct how light, color, and viewing direction interact
+within a scene.
+
+The result is not primarily a precise CAD model or a mesh intended for 3D
+printing. It is a photorealistic spatial representation that can be explored
+interactively and viewed from new camera positions in real time.
+
+Nerfstudio is especially strong in scenes and on surfaces that often cause
+problems for traditional photogrammetry:
+
+- reflections and polished metal;
+- fine hair and complex surface detail;
+- smoke, fog, and partially transparent regions;
+- scenes where visual appearance matters more than millimeter-accurate
+  geometry.
+
+Traditional photogrammetry tools such as RealityCapture or Meshroom remain the
+better choice when the goal is a geometrically precise and editable
+reconstruction, for example:
+
+- 3D printing;
+- CAD and BIM;
+- surveying;
+- technical inspection;
+- dimensionally accurate meshes.
+
+In simple terms:
+
+> **Nerfstudio is particularly well suited for video, VFX, virtual tours, and
+> immersive scenes. Photogrammetry is better suited for precise, measurable,
+> and editable 3D models.**
+
+The two approaches are not true competitors. Nerfstudio itself commonly uses
+Structure-from-Motion and photogrammetry tools during preprocessing to estimate
+the camera positions of the input images.
+
+### Why this repository exists
+
+The practical limitation has traditionally been GPU support. Nerfstudio's
+high-performance Nerfacto training path depends, among other components, on
+`tiny-cuda-nn`, which made it strongly tied to NVIDIA GPUs and CUDA in
+real-world use.
+
+**This repository addresses that limitation.**
+
+It brings the qualified **Nerfacto training path to AMD RDNA4 (`gfx1201`) using
+ROCm 7.2 — without CUDA and without an NVIDIA GPU.**
+
+The current public adaptive-installer qualification covers:
+
+```text
+AMD RDNA4 / gfx1201 runtime: PASS
+Adaptive existing-environment reuse: PASS
+Selected environment unchanged: PASS
+pip freeze unchanged: PASS
+P0 preflight: PASS
+P1 real Nerfacto mechanics: PASS
+Checkpoint verification: PASS
+Evidence manifest chain: PASS
+```
+
+### What do P0, P1, and P2 mean?
+
+The validation process is deliberately divided into separate stages.
+
+#### P0 — Runtime and provenance validation
+
+P0 verifies the required environment before training begins, including the AMD
+GPU and `gfx1201` architecture, ROCm and PyTorch, the native `nerfacc`
+extension, the qualified `tiny-rdna4-nn` runtime, the pinned Nerfstudio source,
+the validation dataset and its hashes, and the disabled fail-closed Viewer
+path.
+
+```text
+PUBLIC_RDNA4_QUICK_P0_PREFLIGHT: PASS
+```
+
+#### P1 — Short real Nerfacto execution
+
+P1 is not merely an import test. It runs the real Nerfacto mechanics on the
+GPU, including training execution, checkpoint creation, checkpoint reload, and
+the associated evidence chain.
+
+```text
+PUBLIC_RDNA4_QUICK_P1_REAL_MECHANICS: PASS
+PUBLIC_RDNA4_QUICK_VALIDATION: PASS
+```
+
+#### P2 — Sustained stability validation
+
+P2 is a separate, substantially longer maintainer validation. It evaluates
+sustained training, longer execution times, and stability problems that may not
+appear during a short qualification run. The public quick-validation wrapper
+never launches P2 automatically.
+
+### Why does the README show both `P2: PASS` and `P2: NOT_RUN`?
+
+They refer to **two different qualification runs**:
+
+1. The canonical internal A5 correctness chain completed A5-P2 successfully.
+   That frozen run executed 576 training steps across the defined continuous
+   and split/resume trajectories, so the top-level project status correctly
+   reports `A5-P2: PASS`.
+2. The later public Adaptive Installer v1.4.3 qualification intentionally
+   reused an existing environment and repeated only the short public P0+P1
+   path. It did not rerun the maintainer-only P2 stage or a separate
+   long-duration training campaign.
+
+The adaptive-installer evidence therefore states:
+
+```text
+P2_SUSTAINED_VALIDATION: NOT_RUN
+LONG_DURATION_TRAINING: NOT_RUN
+```
+
+`NOT_RUN` does not mean `FAIL`. It means that this specific validation run did
+not execute that stage and therefore does not claim it as newly passed.
+
+The two statements are not contradictory: the historical canonical A5-P2
+freeze remains `PASS`, while the separate public v1.4.3 adaptive-installer
+qualification is scoped to P0+P1.
+
+The following are not claimed by the public v1.4.3 adaptive-installer run:
+
+- real GPU qualification of a separately created Fresh-ENV;
+- a new P2 sustained-training qualification;
+- a new multi-hour training-stability claim;
+- complete support for every Nerfstudio method;
+- Viewer support;
+- Splatfacto support;
+- general performance superiority over CUDA.
+<!-- END NERFSTUDIO_EXPLAINER_AND_VALIDATION_STAGES -->
+
 > [!IMPORTANT]
 > This repository is **not** a standalone fork of Nerfstudio and does **not** claim support for every Nerfstudio model or feature.
 >
