@@ -228,9 +228,119 @@ def install_rdna4_portable_mlp_policy() -> dict[str, Any]:
     return dict(policy)
 
 
+PILLOW_ENCODER_COMPAT_MARKER = "amd_nerfstudio_public_pillow_encoder_extents_compat_v1"
+
+
+def _public_pil_to_numpy_with_extents(im: Any) -> Any:
+    """Convert a loaded Pillow image using the encoder extents API."""
+
+    import numpy as np
+    from PIL import Image
+
+    if not hasattr(Image, "_getencoder") or not hasattr(Image, "_conv_type_shape"):
+        raise RuntimeError("required Pillow raw encoder API is unavailable")
+
+    im.load()
+    encoder = Image._getencoder(im.mode, "raw", im.mode)
+    extents = (0, 0) + tuple(im.size)
+    encoder.setimage(im.im, extents)
+
+    shape, typestr = Image._conv_type_shape(im)
+    data = np.empty(shape, dtype=np.dtype(typestr))
+    memory = data.data.cast("B", (data.data.nbytes,))
+
+    buffer_size, status, offset = 65536, 0, 0
+    while not status:
+        _, status, encoded = encoder.encode(buffer_size)
+        memory[offset : offset + len(encoded)] = encoded
+        offset += len(encoded)
+    if status < 0:
+        raise RuntimeError(f"Pillow raw encoder error {status}")
+    if offset != data.data.nbytes:
+        raise RuntimeError(
+            "Pillow raw encoder byte count mismatch: "
+            f"encoded={offset} expected={data.data.nbytes}"
+        )
+    return data
+
+
+def install_pillow_encoder_extents_compatibility() -> dict[str, Any]:
+    """Install a scoped Pillow compatibility function before DataLoader fork."""
+
+    import importlib.metadata
+    import numpy as np
+    from PIL import Image
+    import nerfstudio.data.datasets.base_dataset as base_dataset
+    import nerfstudio.data.utils.data_utils as data_utils
+
+    existing = getattr(data_utils, PILLOW_ENCODER_COMPAT_MARKER, None)
+    if existing is not None:
+        if not isinstance(existing, dict):
+            raise RuntimeError("Pillow compatibility marker has invalid type")
+        if existing.get("effective_call") != "encoder.setimage(im.im, extents)":
+            raise RuntimeError("Pillow compatibility marker has invalid call contract")
+        if existing.get("smoke_test_passed") is not True:
+            raise RuntimeError("Pillow compatibility marker lacks passing smoke test")
+        if data_utils.pil_to_numpy is not _public_pil_to_numpy_with_extents:
+            raise RuntimeError("data_utils pil_to_numpy compatibility function was replaced")
+        if base_dataset.pil_to_numpy is not _public_pil_to_numpy_with_extents:
+            raise RuntimeError("base_dataset pil_to_numpy compatibility function was replaced")
+        return dict(existing)
+
+    original_data_utils = data_utils.pil_to_numpy
+    original_base_dataset = base_dataset.pil_to_numpy
+    if original_data_utils is not original_base_dataset:
+        raise RuntimeError("pinned Nerfstudio pil_to_numpy aliases are not identical")
+
+    data_utils.pil_to_numpy = _public_pil_to_numpy_with_extents
+    base_dataset.pil_to_numpy = _public_pil_to_numpy_with_extents
+
+    try:
+        sample = Image.new("RGB", (2, 2), color=(17, 34, 51))
+        observed = base_dataset.pil_to_numpy(sample)
+        smoke_ok = bool(
+            observed.shape == (2, 2, 3)
+            and observed.dtype == np.uint8
+            and observed.flags.writeable
+            and np.all(observed == np.array([17, 34, 51], dtype=np.uint8))
+        )
+    except Exception:
+        data_utils.pil_to_numpy = original_data_utils
+        base_dataset.pil_to_numpy = original_base_dataset
+        raise
+
+    if not smoke_ok:
+        data_utils.pil_to_numpy = original_data_utils
+        base_dataset.pil_to_numpy = original_base_dataset
+        raise RuntimeError("Pillow encoder-extents compatibility smoke test failed")
+
+    try:
+        pillow_version = importlib.metadata.version("Pillow")
+    except importlib.metadata.PackageNotFoundError:
+        pillow_version = "UNKNOWN"
+
+    policy = {
+        "policy": "PINNED_NERFSTUDIO_PILLOW_ENCODER_EXTENTS_COMPATIBILITY",
+        "scope": "PIL_TO_NUMPY_FUNCTION_ALIAS_ONLY",
+        "pillow_version": pillow_version,
+        "effective_call": "encoder.setimage(im.im, extents)",
+        "extents_contract": "(0, 0, width, height)",
+        "smoke_test_passed": True,
+        "data_utils_alias_patched": True,
+        "base_dataset_alias_patched": True,
+        "nerfstudio_source_modified": False,
+        "pillow_distribution_modified": False,
+        "fail_closed_missing_encoder_api": True,
+    }
+    setattr(data_utils, PILLOW_ENCODER_COMPAT_MARKER, dict(policy))
+    setattr(base_dataset, PILLOW_ENCODER_COMPAT_MARKER, dict(policy))
+    return dict(policy)
+
+
 def build_public_nerfacto_config() -> Any:
     install_viewer_free_import_quarantine()
     portable_mlp_policy = install_rdna4_portable_mlp_policy()
+    pillow_image_compatibility = install_pillow_encoder_extents_compatibility()
 
     from nerfstudio.cameras.camera_optimizers import CameraOptimizerConfig
     from nerfstudio.configs.base_config import ViewerConfig
@@ -278,6 +388,7 @@ def build_public_nerfacto_config() -> Any:
         vis="tensorboard",
     )
     setattr(cfg, "amd_rdna4_portable_mlp_policy", portable_mlp_policy)
+    setattr(cfg, "amd_nerfstudio_pillow_image_compatibility", pillow_image_compatibility)
     return cfg
 
 

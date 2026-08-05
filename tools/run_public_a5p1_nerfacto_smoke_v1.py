@@ -467,13 +467,20 @@ def loaded_tcnn_origins() -> dict[str, str]:
 
 
 def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, rays: int, checkpoint: Path | None = None) -> tuple[Any, dict[str, Any]]:
-    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_rdna4_portable_mlp_policy
+    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_pillow_encoder_extents_compatibility, install_rdna4_portable_mlp_policy
     cfg = copy.deepcopy(build_public_nerfacto_config())
     portable_mlp_policy = install_rdna4_portable_mlp_policy()
     if portable_mlp_policy.get("effective_otype") != "PortableMLP":
         raise RuntimeError("public Nerfacto config did not select PortableMLP")
     if portable_mlp_policy.get("fail_closed_unknown_otype") is not True:
         raise RuntimeError("public PortableMLP policy is not fail closed")
+    pillow_image_compatibility = install_pillow_encoder_extents_compatibility()
+    if pillow_image_compatibility.get("smoke_test_passed") is not True:
+        raise RuntimeError("public Pillow compatibility smoke test did not pass")
+    if pillow_image_compatibility.get("nerfstudio_source_modified") is not False:
+        raise RuntimeError("public Pillow compatibility modified Nerfstudio source")
+    if pillow_image_compatibility.get("pillow_distribution_modified") is not False:
+        raise RuntimeError("public Pillow compatibility modified Pillow distribution")
     cfg.data = data
     cfg.output_dir = output_dir
     cfg.experiment_name = run_name
@@ -530,6 +537,7 @@ def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, ra
         "loader_policy": "PUBLIC_SINGLE_WORKER_FAIL_CLOSED",
         "model_implementation": getattr(cfg.pipeline.model, "implementation", None),
         "portable_mlp_policy": portable_mlp_policy,
+        "pillow_image_compatibility": pillow_image_compatibility,
         "load_checkpoint": str(checkpoint) if checkpoint else None,
     }
     return cfg, summary

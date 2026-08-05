@@ -192,3 +192,19 @@ rewriting only the TCNN network `otype` from the known upstream values
 `FullyFusedMLP` or `CutlassMLP` to `PortableMLP`.  Unknown backend names are
 rejected.  P0 records and verifies the policy before emitting its runtime
 policy, and P1 independently checks the same policy before trainer setup.
+
+## dev5e Pillow encoder-extents compatibility
+
+The dev5d producer passed P0, constructed the PortableMLP Nerfacto model, and
+entered the real training iteration. The first DataLoader image then exposed
+an API mismatch between the pinned Nerfstudio image fast path and the active
+Pillow runtime: Nerfstudio called `encoder.setimage(im.im)` while the active
+encoder requires explicit tile extents.
+
+Dev5e does not modify the pinned Nerfstudio worktree and does not downgrade or
+replace Pillow. The scoped public configuration installs a process-local
+`pil_to_numpy` compatibility function before the DataLoader worker is created.
+It preserves Nerfstudio's raw-encoder path and supplies `(0, 0, width, height)`
+to `setimage`. Both imported Nerfstudio aliases are patched together and a
+real writable 2x2 RGB conversion must pass before P0 can emit its policy and
+before P1 can call `trainer.setup()`.

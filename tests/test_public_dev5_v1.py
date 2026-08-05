@@ -107,6 +107,42 @@ class PublicDev5Tests(unittest.TestCase):
         )
 
 
+
+    def test_pillow_encoder_extents_compatibility_is_scoped_and_attested(self):
+        config = NERFACTO_CONFIG.read_text(encoding="utf-8")
+        p0 = P0_RUNNER.read_text(encoding="utf-8")
+        p1 = P1_RUNNER.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'PILLOW_ENCODER_COMPAT_MARKER = "amd_nerfstudio_public_pillow_encoder_extents_compat_v1"',
+            config,
+        )
+        self.assertIn('encoder.setimage(im.im, extents)', config)
+        self.assertIn('extents = (0, 0) + tuple(im.size)', config)
+        self.assertIn(
+            'base_dataset.pil_to_numpy = _public_pil_to_numpy_with_extents',
+            config,
+        )
+        self.assertIn(
+            'data_utils.pil_to_numpy = _public_pil_to_numpy_with_extents',
+            config,
+        )
+        self.assertIn('"nerfstudio_source_modified": False', config)
+        self.assertIn('"pillow_distribution_modified": False', config)
+        self.assertIn(
+            '"pillow_image_compatibility": pillow_image_compatibility',
+            p0,
+        )
+        self.assertIn('runtime_anchors["pillow_image_compatibility"]', p0)
+        self.assertIn(
+            '"pillow_image_compatibility": pillow_image_compatibility',
+            p1,
+        )
+        self.assertIn(
+            'public Pillow compatibility smoke test did not pass',
+            p1,
+        )
+
     def test_portable_mlp_policy_rewrites_known_backends_and_rejects_unknown(self):
         config_module = load_module(
             NERFACTO_CONFIG,
