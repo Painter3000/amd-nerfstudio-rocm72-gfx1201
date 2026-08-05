@@ -1,35 +1,9 @@
 {
-  "schema": "amd-nerfstudio-rocm72-gfx1201-reference-v1",
-  "scope": "NERFACTO_TRAINING_CHAIN_NOT_FULL_NERFSTUDIO",
-  "target": {
-    "torch": "2.13.0+rocm7.2",
-    "hip": "7.2.53211",
-    "gcn_arch": "gfx1201",
-    "python_major_minor": "3.12"
-  },
   "nerfstudio": {
     "commit": "50e0e3c70c775e89333256213363badbf074f29d",
-    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e",
     "mlp_relative_path": "nerfstudio/field_components/mlp.py",
-    "mlp_sha256": "4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad"
-  },
-  "runtime": {
-    "tinycudann_modules_relative_path": "tinycudann/modules.py",
-    "tinycudann_modules_sha256": "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
-    "tinycudann_native_glob": "tinycudann_bindings/_120_C*.so",
-    "tinycudann_native_sha256": "883f89efdad7bb909a4a3899ab79b2defe9713fdb5c7cf22cf4882c626b3efc4",
-    "nerfacc_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2"
-  },
-  "qualification": {
-    "seed": 20260803,
-    "rays_per_batch": 1024,
-    "dataloader_num_workers": 1,
-    "prefetch_factor": 2,
-    "p2_steps": 192,
-    "p2_split_step": 96,
-    "p2_warmup": 16,
-    "p2_telemetry_interval": 4,
-    "p2_gradient_interval": 32
+    "mlp_sha256": "4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad",
+    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e"
   },
   "nonclaims": [
     "FULL_NERFSTUDIO_FEATURE_COVERAGE",
@@ -39,5 +13,37 @@
     "INFINITE_HORIZON_LEAK_FREEDOM",
     "VMM_FALLBACK_PERFORMANCE_PARITY",
     "PERFORMANCE_SUPERIORITY_OVER_CUDA"
-  ]
+  ],
+  "qualification": {
+    "dataloader_num_workers": 1,
+    "p2_gradient_interval": 32,
+    "p2_split_step": 96,
+    "p2_steps": 192,
+    "p2_telemetry_interval": 4,
+    "p2_warmup": 16,
+    "prefetch_factor": 2,
+    "rays_per_batch": 1024,
+    "seed": 20260803
+  },
+  "runtime": {
+    "nerfacc_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
+    "tinycudann_modules_relative_path": "tinycudann/modules.py",
+    "tinycudann_modules_sha256": "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
+    "tinycudann_native_glob": "tinycudann_bindings/_120_C*.so",
+    "tinycudann_native_sha256": "4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917",
+    "tinycudann_source": {
+      "commit": "b98bdcc6b2878f6cb6c10a2141e50867cec6d96a",
+      "tag": "phase4a2-model-b-public-gfx1201-pass",
+      "tree": "a8ffaaa3f509400c40f6de58e8a74fb047f8e16e",
+      "url": "https://github.com/Painter3000/tiny-rdna4-nn.git"
+    }
+  },
+  "schema": "amd-nerfstudio-rocm72-gfx1201-reference-v1",
+  "scope": "NERFACTO_TRAINING_CHAIN_NOT_FULL_NERFSTUDIO",
+  "target": {
+    "gcn_arch": "gfx1201",
+    "hip": "7.2.53211",
+    "python_major_minor": "3.12",
+    "torch": "2.13.0+rocm7.2"
+  }
 }
