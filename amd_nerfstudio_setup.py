@@ -15,7 +15,7 @@ import zipfile
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev4d"
+VERSION = "1.5.0-dev4e"
 SCHEMA = "amd-nerfstudio-public-installer-v1-5-nerfacc-nerfstudio"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
@@ -82,6 +82,10 @@ VISER_WHEEL_FILENAME = "viser-1.0.0-py3-none-any.whl"
 VISER_WHEEL_SHA256 = "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb"
 SCOPED_RUNTIME_REQUIREMENTS = "requirements/nerfacto_runtime_v1.txt"
 SCOPED_RUNTIME_CONSTRAINTS = "constraints/nerfacto_rocm72_py312_v1.txt"
+SCOPED_RUNTIME_IMPORT_PINS = {
+    "PyYAML": "6.0.3",
+    "rawpy": "0.27.0",
+}
 RUNTIME_PTH_FILENAME = "00_amd_nerfstudio_rdna4_runtime.pth"
 VISER_MATH_RUNTIME_DIRNAME = "viser-math-only-v1"
 VISER_MATH_MARKER = ".amd-nerfstudio-viser-math-only-v1.json"
@@ -1863,18 +1867,41 @@ def deploy_viser_math_runtime(report: dict[str, Any], wheel: Path) -> dict[str, 
             "modified": False,
             "verification": existing,
         }
+    unverified_backup: Path | None = None
     if runtime.exists():
-        return {
-            "passed": False,
-            "status": "BLOCKED",
-            "reason": "EXISTING_VISER_MATH_RUNTIME_UNVERIFIED",
-            "runtime": str(runtime),
-            "verification": existing,
-        }
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        unverified_backup = runtime.with_name(
+            runtime.name + f".unverified-{timestamp}-{os.getpid()}"
+        )
+        if unverified_backup.exists():
+            return {
+                "passed": False,
+                "status": "BLOCKED",
+                "reason": "VISER_UNVERIFIED_BACKUP_COLLISION",
+                "runtime": str(runtime),
+                "backup": str(unverified_backup),
+                "verification": existing,
+            }
+        try:
+            os.replace(runtime, unverified_backup)
+        except Exception as exc:
+            return {
+                "passed": False,
+                "status": "FAIL",
+                "reason": "VISER_UNVERIFIED_RUNTIME_QUARANTINE_FAILED",
+                "runtime": str(runtime),
+                "backup": str(unverified_backup),
+                "error": repr(exc),
+                "verification": existing,
+            }
     if sha256_file(wheel) != VISER_WHEEL_SHA256:
+        if unverified_backup is not None and unverified_backup.exists():
+            os.replace(unverified_backup, runtime)
         return {"passed": False, "status": "BLOCKED", "reason": "VISER_WHEEL_SHA256_MISMATCH", "wheel": str(wheel)}
     selection = viser_math_member_names(wheel)
     if not selection.get("passed"):
+        if unverified_backup is not None and unverified_backup.exists():
+            os.replace(unverified_backup, runtime)
         return {"passed": False, "status": "BLOCKED", "reason": "VISER_MATH_MEMBER_CONTRACT_FAILED", "selection": selection}
     staging = runtime.with_name(runtime.name + f".staging-{os.getpid()}")
     if staging.exists():
@@ -1927,14 +1954,46 @@ def deploy_viser_math_runtime(report: dict[str, Any], wheel: Path) -> dict[str, 
         os.replace(staging, runtime)
     except Exception as exc:
         shutil.rmtree(staging, ignore_errors=True)
-        return {"passed": False, "status": "FAIL", "reason": "VISER_MATH_RUNTIME_DEPLOY_FAILED", "error": repr(exc), "selection": selection}
+        if runtime.exists():
+            shutil.rmtree(runtime, ignore_errors=True)
+        restored = False
+        if unverified_backup is not None and unverified_backup.exists():
+            os.replace(unverified_backup, runtime)
+            restored = True
+        return {
+            "passed": False,
+            "status": "FAIL",
+            "reason": "VISER_MATH_RUNTIME_DEPLOY_FAILED",
+            "error": repr(exc),
+            "selection": selection,
+            "unverified_runtime_restored": restored,
+        }
     final = verify_viser_math_runtime(runtime)
+    if not final.get("passed") and unverified_backup is not None:
+        shutil.rmtree(runtime, ignore_errors=True)
+        os.replace(unverified_backup, runtime)
+        return {
+            "passed": False,
+            "status": "FAIL",
+            "reason": "VISER_MATH_RUNTIME_FINAL_ATTESTATION_FAILED",
+            "runtime": str(runtime),
+            "modified": False,
+            "unverified_runtime_restored": True,
+            "selection": selection,
+            "verification": final,
+        }
+    if final.get("passed") and unverified_backup is not None:
+        shutil.rmtree(unverified_backup, ignore_errors=True)
     return {
         "passed": final.get("passed") is True,
         "status": "READY" if final.get("passed") else "FAIL",
         "reason": "QUALIFIED_VISER_MATH_RUNTIME_DEPLOYED" if final.get("passed") else "VISER_MATH_RUNTIME_FINAL_ATTESTATION_FAILED",
         "runtime": str(runtime),
         "modified": True,
+        "replaced_unverified_runtime": unverified_backup is not None,
+        "unverified_backup_removed": (
+            unverified_backup is None or not unverified_backup.exists()
+        ),
         "selection": selection,
         "verification": final,
     }
@@ -2002,6 +2061,8 @@ try:
     viewer_policy = install_viewer_free_import_quarantine()
 
     import torch
+    import yaml
+    import rawpy
     import nerfacc.csrc as nerfacc_csrc
     import tinycudann.modules as tcnn_modules
     import viser
@@ -2030,6 +2091,10 @@ try:
         ),
         "viser_transforms": str(pathlib.Path(viser_transforms.__file__).resolve()),
         "rich_version": metadata.version("rich"),
+        "pyyaml_version": metadata.version("PyYAML"),
+        "rawpy_version": metadata.version("rawpy"),
+        "yaml_module": str(pathlib.Path(yaml.__file__).resolve()),
+        "rawpy_module": str(pathlib.Path(rawpy.__file__).resolve()),
         "opencv_headless": metadata.version("opencv-python-headless"),
     })
     try:
@@ -2084,6 +2149,10 @@ print(json.dumps(payload, sort_keys=True))
         "viser_distribution_absent": payload.get("viser_distribution") is None,
         "viser_transforms_origin": str(payload.get("viser_transforms", "")).startswith(str(Path(report["paths"]["viser_math_runtime"]).resolve())),
         "rich": payload.get("rich_version") == NERFACC_RICH_PINS["rich"],
+        "pyyaml": payload.get("pyyaml_version") == SCOPED_RUNTIME_IMPORT_PINS["PyYAML"],
+        "rawpy": payload.get("rawpy_version") == SCOPED_RUNTIME_IMPORT_PINS["rawpy"],
+        "yaml_origin": bool(payload.get("yaml_module")),
+        "rawpy_origin": bool(payload.get("rawpy_module")),
         "opencv_headless": payload.get("opencv_headless") == "4.10.0.84",
         "opencv_gui_absent": payload.get("opencv_gui") is None,
     }
@@ -2415,11 +2484,21 @@ def self_test() -> int:
             "remove_stale_full_viser_distribution"
         ):
             failures.append("viser cleanup stage")
+        if SCOPED_RUNTIME_IMPORT_PINS != {
+            "PyYAML": "6.0.3",
+            "rawpy": "0.27.0",
+        }:
+            failures.append("scoped import dependency pins")
+        deploy_source = __import__("inspect").getsource(
+            deploy_viser_math_runtime
+        )
+        if "replaced_unverified_runtime" not in deploy_source:
+            failures.append("viser unverified runtime replacement")
     payload = {
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 23,
+        "tests": 25,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")

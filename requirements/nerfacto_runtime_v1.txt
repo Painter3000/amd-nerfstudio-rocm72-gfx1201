@@ -31,3 +31,5 @@ packaging
 fpsample
 pybind11
 tensorly
+PyYAML==6.0.3
+rawpy==0.27.0; platform_machine != 'arm64' and platform_machine != 'aarch64'

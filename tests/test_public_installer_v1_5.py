@@ -369,6 +369,41 @@ class PublicInstallerV15Tests(unittest.TestCase):
             self.assertTrue((runtime / "viser" / "transforms" / "_so3.py").is_file())
             self.assertFalse((runtime / "viser" / "_viser.py").exists())
 
+    def test_viser_math_runtime_replaces_unverified_existing_tree(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wheel = root / "viser.whl"
+            with zipfile.ZipFile(wheel, "w") as archive:
+                for name in (
+                    "viser/transforms/__init__.py",
+                    "viser/transforms/_base.py",
+                    "viser/transforms/_se2.py",
+                    "viser/transforms/_se3.py",
+                    "viser/transforms/_so2.py",
+                    "viser/transforms/_so3.py",
+                ):
+                    archive.writestr(name, "# fixture\n")
+                archive.writestr("viser-1.0.0.dist-info/licenses/LICENSE", "MIT\n")
+            runtime = root / "runtime" / installer.VISER_MATH_RUNTIME_DIRNAME
+            runtime.mkdir(parents=True)
+            (runtime / "stale.txt").write_text("stale\n", encoding="utf-8")
+            report = {
+                "paths": {
+                    "viser_math_runtime": str(runtime),
+                }
+            }
+            original_hash = installer.VISER_WHEEL_SHA256
+            try:
+                installer.VISER_WHEEL_SHA256 = installer.sha256_file(wheel)
+                result = installer.deploy_viser_math_runtime(report, wheel)
+            finally:
+                installer.VISER_WHEEL_SHA256 = original_hash
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["replaced_unverified_runtime"])
+            self.assertTrue(result["unverified_backup_removed"])
+            self.assertFalse((runtime / "stale.txt").exists())
+            self.assertTrue((runtime / installer.VISER_MATH_MARKER).is_file())
+
     def test_runtime_probe_installs_viewer_quarantine_before_trainer_import(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
@@ -426,6 +461,10 @@ class PublicInstallerV15Tests(unittest.TestCase):
                 ),
                 "viser_distribution": None,
                 "rich_version": installer.NERFACC_RICH_PINS["rich"],
+                "pyyaml_version": installer.SCOPED_RUNTIME_IMPORT_PINS["PyYAML"],
+                "rawpy_version": installer.SCOPED_RUNTIME_IMPORT_PINS["rawpy"],
+                "yaml_module": str(root / "venv" / "site-packages" / "yaml" / "__init__.py"),
+                "rawpy_module": str(root / "venv" / "site-packages" / "rawpy" / "__init__.py"),
                 "opencv_headless": "4.10.0.84",
                 "opencv_gui": None,
             }
@@ -469,10 +508,24 @@ class PublicInstallerV15Tests(unittest.TestCase):
                 code.index("import viser\n"),
             )
             self.assertIn("VIEWER_FREE_STUB_MARKER", code)
+            self.assertIn("import yaml", code)
+            self.assertIn("import rawpy", code)
             self.assertEqual(
                 str(tools.resolve()),
                 captured["env"]["AMD_NERFSTUDIO_PROJECT_TOOLS"],
             )
+
+    def test_scoped_runtime_import_dependencies_are_pinned(self) -> None:
+        requirements = (ROOT / installer.SCOPED_RUNTIME_REQUIREMENTS).read_text(encoding="utf-8")
+        constraints = (ROOT / installer.SCOPED_RUNTIME_CONSTRAINTS).read_text(encoding="utf-8")
+        self.assertIn("PyYAML==6.0.3", requirements)
+        self.assertIn("rawpy==0.27.0", requirements)
+        self.assertIn("PyYAML==6.0.3", constraints)
+        self.assertIn("rawpy==0.27.0", constraints)
+        self.assertEqual(
+            {"PyYAML": "6.0.3", "rawpy": "0.27.0"},
+            installer.SCOPED_RUNTIME_IMPORT_PINS,
+        )
 
     def test_nerfstudio_source_is_locked(self) -> None:
         self.assertEqual(

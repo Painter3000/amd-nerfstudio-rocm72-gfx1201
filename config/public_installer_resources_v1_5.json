@@ -168,16 +168,21 @@
   "scope": "MANAGED_GFX1201_NERFACTO_P0_P1_RUNTIME_INSTALLER",
   "scoped_nerfstudio_runtime": {
     "constraints": "constraints/nerfacto_rocm72_py312_v1.txt",
-    "constraints_sha256": "61620e3b841fce3852844ea3bc4bbe6e48363d7317399d88759266822afb0fe0",
+    "constraints_sha256": "3f78d5fa71b274bd0d1100c2e1317561bbfd0c5e2aad70f874ceb4f69f81c9c8",
     "full_distribution_install": false,
+    "import_dependency_pins": {
+      "PyYAML": "6.0.3",
+      "rawpy": "0.27.0"
+    },
     "opencv_policy": {
       "forbidden": "opencv-python",
       "required": "opencv-python-headless==4.10.0.84"
     },
     "reason": "Avoid declaring unsupported full Nerfstudio optional dependencies while exposing the qualified source runtime.",
     "requirements": "requirements/nerfacto_runtime_v1.txt",
-    "requirements_sha256": "4ad71a9da2d0023ce36b302da3f0f18a6c27cf2b51919e5c953e45ff3175d621",
-    "source_registration": "00_amd_nerfstudio_rdna4_runtime.pth"
+    "requirements_sha256": "140c1882d6c3d98d020ec87088a30d903c8274cf4c47af0e4315bef08f78eafd",
+    "source_registration": "00_amd_nerfstudio_rdna4_runtime.pth",
+    "unverified_viser_runtime_policy": "TRANSACTIONAL_REPLACE_FROM_LOCKED_WHEEL_WITH_ROLLBACK"
   },
   "target": {
     "architecture": "gfx1201",
@@ -220,5 +225,5 @@
     "tag": "phase4a2-model-b-public-gfx1201-pass",
     "url": "https://github.com/Painter3000/tiny-rdna4-nn.git"
   },
-  "version": "1.5.0-dev4d"
+  "version": "1.5.0-dev4e"
 }

@@ -1,6 +1,6 @@
 # Public installer v1.5
 
-> dev4d deploys a hash-attested, viewer-free `viser.transforms` runtime from
+> dev4e completes the scoped Nerfacto import contract and deploys a hash-attested, viewer-free `viser.transforms` runtime from
 > the locked Viser 1.0.0 wheel. The full Viser GUI/server distribution is not
 > retained in the managed environment.
 
@@ -120,6 +120,11 @@ file-hash marker, and places that managed runtime first on `sys.path`. This
 avoids importing Viser's GUI/server initializer and keeps `pip check` strict.
 Viewer construction remains fail-closed.
 
+An existing viewer-free runtime that fails the current marker contract is
+quarantined and replaced from the locked wheel. Deployment is transactional:
+the old runtime is restored if extraction or attestation fails, and removed
+only after the replacement passes.
+
 The final scoped import qualification installs the existing
 `public_nerfacto_config_v1` viewer quarantine before importing
 `nerfstudio.engine.trainer` and the other P0/P1 modules. This is required
@@ -136,10 +141,15 @@ build packages first; the global `pip check` is deferred until after the
 application-level repair. New environments still require immediate global
 dependency closure.
 
+The scoped runtime also pins `PyYAML==6.0.3` for Nerfstudio experiment
+configuration and `rawpy==0.27.0` on x86_64 for the eager dataparser import
+chain reached by `ParallelDataManagerConfig`. These imports are qualified even
+when the selected quick-validation dataset does not contain camera RAW files.
+
 The scoped runtime requires `opencv-python-headless==4.10.0.84` and rejects the
 GUI `opencv-python` distribution.
 
-## dev4d invocation
+## dev4e invocation
 
 For an installation where the earlier stages are already qualified:
 
@@ -170,6 +180,6 @@ python3.12 ./amd_nerfstudio_setup.py \
 
 ## Scope boundary
 
-Dev4d does not claim the full Nerfstudio dependency set, viewer-server support,
+Dev4e does not claim the full Nerfstudio dependency set, viewer-server support,
 Open3D, COLMAP, data-processing utilities, or P0/P1 execution. Dataset deployment
 and the actual P0/P1 gates are later v1.5 stages.
