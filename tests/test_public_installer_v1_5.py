@@ -238,6 +238,55 @@ class PublicInstallerV15Tests(unittest.TestCase):
             installer.VISER_WHEEL_SHA256,
         )
 
+
+    def test_build_report_exposes_requested_arch(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            script = root / "amd_nerfstudio_setup.py"
+            script.write_text("#!/usr/bin/env python3\n", encoding="utf-8")
+            args = installer.argparse.Namespace(
+                workdir=root / "install",
+                env=None,
+                rocm_path=Path("/opt/rocm"),
+                arch=installer.SUPPORTED_ARCH,
+                validation="quick",
+                prepare_env=False,
+                install_torch=False,
+                build_tiny=False,
+                install_nerfacc=False,
+                nerfacc_wheel=None,
+                install_nerfstudio=False,
+                max_jobs=8,
+                self_test=False,
+                json_report=None,
+            )
+            originals = (
+                installer.select_environment,
+                installer.host_package_probes,
+                installer.rocm_probe,
+            )
+            try:
+                installer.select_environment = lambda paths, explicit_env: {
+                    "passed": True,
+                    "path": str(paths["env"]),
+                    "ownership": "MANAGED_NEW",
+                    "action": "CREATE_NEW_ENV",
+                    "reason": "MANAGED_ENV_ABSENT",
+                }
+                installer.host_package_probes = lambda: []
+                installer.rocm_probe = lambda path: {
+                    "passed": True,
+                    "requested": str(path),
+                }
+                report = installer.build_report(args, script)
+            finally:
+                (
+                    installer.select_environment,
+                    installer.host_package_probes,
+                    installer.rocm_probe,
+                ) = originals
+            self.assertEqual(installer.SUPPORTED_ARCH, report["arch"])
+
     def test_nerfstudio_install_requires_passing_preflight(self) -> None:
         result = installer.install_nerfstudio_runtime({"passed": False})
         self.assertFalse(result["passed"])

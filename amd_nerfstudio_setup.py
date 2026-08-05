@@ -14,7 +14,7 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev4"
+VERSION = "1.5.0-dev4a"
 SCHEMA = "amd-nerfstudio-public-installer-v1-5-nerfacc-nerfstudio"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
@@ -1849,6 +1849,7 @@ def build_report(args: argparse.Namespace, script_path: Path) -> dict[str, Any]:
             "PREFLIGHT_ONLY"
         ),
         "paths": {key: str(value) for key, value in paths.items()},
+        "arch": args.arch,
         "platform_checks": platform_checks,
         "host_packages": packages,
         "missing_host_packages": missing,
@@ -1991,6 +1992,9 @@ def self_test() -> int:
             failures.append("tiny commit lock")
         if TINY_TAG != "phase4a2-model-b-public-gfx1201-pass":
             failures.append("tiny tag lock")
+        synthetic_report = {"arch": SUPPORTED_ARCH}
+        if synthetic_report.get("arch") != SUPPORTED_ARCH:
+            failures.append("report arch contract")
         loader = compose_runtime_library_path(
             Path("/env/torch/lib"),
             Path("/opt/rocm"),
@@ -2019,7 +2023,7 @@ def self_test() -> int:
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 17,
+        "tests": 18,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")

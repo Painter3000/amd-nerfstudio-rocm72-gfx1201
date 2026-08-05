@@ -1,5 +1,9 @@
 # Public installer v1.5
 
+> dev4a fixes the report schema so the requested `gfx1201` architecture is
+> preserved at top level and can be reused by the tiny-rdna4-nn, nerfacc, and
+> Nerfstudio runtime verification stages.
+
 The v1.5 installer operates entirely below a user-controlled installation root.
 It does not invoke `sudo`, `apt`, or another operating-system package manager.
 
@@ -114,7 +118,7 @@ surface. Viewer construction remains fail-closed.
 The scoped runtime requires `opencv-python-headless==4.10.0.84` and rejects the
 GUI `opencv-python` distribution.
 
-## dev4 invocation
+## dev4a invocation
 
 For an installation where the earlier stages are already qualified:
 
@@ -145,6 +149,6 @@ python3.12 ./amd_nerfstudio_setup.py \
 
 ## Scope boundary
 
-Dev4 does not claim the full Nerfstudio dependency set, viewer-server support,
+Dev4a does not claim the full Nerfstudio dependency set, viewer-server support,
 Open3D, COLMAP, data-processing utilities, or P0/P1 execution. Dataset deployment
 and the actual P0/P1 gates are later v1.5 stages.
