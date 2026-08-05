@@ -33,6 +33,7 @@ class PublicInstallerV15Tests(unittest.TestCase):
             paths = installer.derive_paths(script, workdir, None)
             self.assertEqual(workdir / "venv", paths["env"])
             self.assertEqual(workdir / "sources" / "tiny-rdna4-nn", paths["tiny_source"])
+            self.assertEqual(workdir / "sources" / "nerfstudio", paths["nerfstudio_source"])
             self.assertEqual(workdir / "runtime" / "tiny-rdna4-nn", paths["tiny_runtime"])
 
     def test_only_managed_env_is_autodetected(self) -> None:
@@ -65,7 +66,6 @@ class PublicInstallerV15Tests(unittest.TestCase):
         self.assertLess(text.index("git"), text.index("python3.12-dev"))
         self.assertIn("sudo apt update", text)
         self.assertIn("sudo apt install --no-install-recommends", text)
-
 
     def test_build_package_requirements_are_pinned(self) -> None:
         self.assertEqual(
@@ -109,14 +109,8 @@ class PublicInstallerV15Tests(unittest.TestCase):
         self.assertEqual("7.2.53211", installer.EXPECTED_TORCH_HIP)
 
     def test_tiny_source_is_locked_to_qualified_public_commit(self) -> None:
-        self.assertEqual(
-            "phase4a2-model-b-public-gfx1201-pass",
-            installer.TINY_TAG,
-        )
-        self.assertEqual(
-            "b98bdcc6b2878f6cb6c10a2141e50867cec6d96a",
-            installer.TINY_COMMIT,
-        )
+        self.assertEqual("phase4a2-model-b-public-gfx1201-pass", installer.TINY_TAG)
+        self.assertEqual("b98bdcc6b2878f6cb6c10a2141e50867cec6d96a", installer.TINY_COMMIT)
 
     def test_external_env_torch_install_is_verify_only(self) -> None:
         report = {
@@ -133,17 +127,10 @@ class PublicInstallerV15Tests(unittest.TestCase):
 
     def test_runtime_library_path_is_environment_aware(self) -> None:
         value = installer.compose_runtime_library_path(
-            Path("/env/torch/lib"),
-            Path("/opt/rocm"),
-            "/custom/lib:/env/torch/lib",
+            Path("/env/torch/lib"), Path("/opt/rocm"), "/custom/lib:/env/torch/lib"
         )
         self.assertEqual(
-            [
-                "/env/torch/lib",
-                "/opt/rocm/lib",
-                "/opt/rocm/lib64",
-                "/custom/lib",
-            ],
+            ["/env/torch/lib", "/opt/rocm/lib", "/opt/rocm/lib64", "/custom/lib"],
             value.split(installer.os.pathsep),
         )
 
@@ -166,7 +153,6 @@ class PublicInstallerV15Tests(unittest.TestCase):
             (source / "scripts" / "phase4a_hipcc_compat.sh").chmod(0o755)
             for dep in ("cutlass", "fmt", "cmrc"):
                 (source / "dependencies" / dep / ".git").mkdir(parents=True)
-
             values = {
                 ("rev-parse", "HEAD"): installer.TINY_COMMIT,
                 ("rev-parse", "HEAD^{tree}"): "tree-sha",
@@ -182,6 +168,80 @@ class PublicInstallerV15Tests(unittest.TestCase):
                 installer.git_output = original
             self.assertTrue(result["passed"])
             self.assertTrue(result["checks"]["submodules_clean"])
+
+    def test_nerfacc_contract_is_fully_locked(self) -> None:
+        self.assertEqual(
+            "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00",
+            installer.NERFACC_WHEEL_SHA256,
+        )
+        self.assertEqual(
+            "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
+            installer.NERFACC_NATIVE_SHA256,
+        )
+        self.assertEqual(
+            "d84cdf3afd7dcfc42150e0f0506db58a5ce62812",
+            installer.NERFACC_SOURCE_COMMIT,
+        )
+
+    def test_nerfacc_python_dependencies_are_pinned(self) -> None:
+        self.assertEqual(
+            [f"{name}=={version}" for name, version in installer.NERFACC_RICH_PINS.items()],
+            installer.nerfacc_python_requirements(),
+        )
+
+    def test_missing_authorized_nerfacc_wheel_is_blocked(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            report = {"paths": {"cache": str(Path(td) / "cache")}}
+            result = installer.resolve_nerfacc_wheel(report, None)
+            self.assertFalse(result["passed"])
+            self.assertEqual("AUTHORIZED_NERFACC_WHEEL_NOT_FOUND", result["reason"])
+
+    def test_external_env_nerfacc_install_is_verify_only(self) -> None:
+        report = {
+            "passed": True,
+            "environment_selection": {
+                "ownership": "EXTERNAL_EXPLICIT",
+                "path": "/tmp/external-env",
+            },
+        }
+        result = installer.install_nerfacc_stack(report)
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["modified"])
+        self.assertEqual("EXPLICIT_EXTERNAL_ENV_IS_VERIFY_ONLY", result["reason"])
+
+    def test_scoped_pip_check_allows_only_viser_advisories(self) -> None:
+        allowed = installer.evaluate_pip_check({
+            "returncode": 1,
+            "stdout": "viser 1.0.0 requires yourdfpy, which is not installed.\n",
+            "stderr": "",
+        })
+        rejected = installer.evaluate_pip_check({
+            "returncode": 1,
+            "stdout": "nerfacc 0.5.2 requires rich, which is not installed.\n",
+            "stderr": "",
+        })
+        self.assertTrue(allowed["passed"])
+        self.assertFalse(rejected["passed"])
+
+    def test_nerfstudio_source_is_locked(self) -> None:
+        self.assertEqual(
+            "50e0e3c70c775e89333256213363badbf074f29d",
+            installer.NERFSTUDIO_COMMIT,
+        )
+        self.assertEqual(
+            "9d5ff468eeff89b66995e9984acaa378c37dc07e",
+            installer.NERFSTUDIO_TREE,
+        )
+        self.assertEqual("1.0.0", installer.VISER_VERSION)
+        self.assertEqual(
+            "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb",
+            installer.VISER_WHEEL_SHA256,
+        )
+
+    def test_nerfstudio_install_requires_passing_preflight(self) -> None:
+        result = installer.install_nerfstudio_runtime({"passed": False})
+        self.assertFalse(result["passed"])
+        self.assertEqual("PREFLIGHT_NOT_PASSED", result["reason"])
 
     def test_self_test(self) -> None:
         self.assertEqual(0, installer.self_test())

@@ -1,41 +1,27 @@
 {
-  "schema": "amd-nerfstudio-public-installer-resources-v1-5",
-  "version": "1.5.0-dev3",
-  "scope": "EMPTY_DIRECTORY_OR_EXPLICIT_ENV_INSTALLER_FOR_GFX1201",
-  "target": {
-    "architecture": "gfx1201",
-    "python_major_minor": "3.12",
-    "torch": "2.13.0+rocm7.2",
-    "torchvision": "0.28.0+rocm7.2",
-    "hip": "7.2.53211",
-    "rocm_default_path": "/opt/rocm",
-    "viser_math": "1.0.0"
-  },
-  "path_contract": {
-    "workdir_default": "INSTALLER_DIRECTORY_UNLESS_RUNNING_FROM_PROJECT_REPOSITORY",
-    "managed_env": "venv",
-    "project_repository": "amd-nerfstudio-rocm72-gfx1201",
-    "nerfstudio_source": "sources/nerfstudio",
-    "tiny_rdna4_source": "sources/tiny-rdna4-nn",
-    "tiny_rdna4_build": "build/tiny-rdna4-nn",
-    "tiny_rdna4_runtime": "runtime/tiny-rdna4-nn",
-    "dataset": "datasets/quick-validation-dataset-v2",
-    "cache": "cache",
-    "reports": "reports",
-    "logs": "logs"
+  "environment_bootstrap": {
+    "activation_required": false,
+    "explicit_external_env": "VERIFY_ONLY_NO_MODIFICATION",
+    "failure_cleanup": "REMOVE_ONLY_ENV_CREATED_BY_CURRENT_INVOCATION_WHILE_MARKED_INCOMPLETE",
+    "managed_marker": ".amd-nerfstudio-managed-v1.json",
+    "mode": "MANAGED_ENV_CREATE_OR_REFRESH",
+    "packages": {
+      "cmake": "4.4.0",
+      "ninja": "1.13.0",
+      "packaging": "26.2",
+      "pip": "26.1.2",
+      "setuptools": "83.0.0",
+      "wheel": "0.47.0"
+    },
+    "public_index": "https://pypi.org/simple",
+    "python_invocation": "ENV_ROOT/bin/python"
   },
   "environment_policy": {
+    "create_managed_env_when_missing": true,
     "explicit_env_priority": true,
     "managed_env_search_path": "venv",
-    "scan_other_directories": false,
     "repair_external_env_in_place": false,
-    "create_managed_env_when_missing": true
-  },
-  "privilege_policy": {
-    "root_execution": "BLOCKED",
-    "automatic_sudo": false,
-    "automatic_apt": false,
-    "missing_host_packages": "PRINT_COMMAND_AND_EXIT_BLOCKED"
+    "scan_other_directories": false
   },
   "host_packages": [
     "build-essential",
@@ -52,28 +38,167 @@
     "gzip",
     "unzip"
   ],
-  "nerfstudio_source": {
-    "url": "https://github.com/nerfstudio-project/nerfstudio.git",
-    "commit": "50e0e3c70c775e89333256213363badbf074f29d",
-    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e"
+  "implementation_stage": {
+    "dataset_deployment": "NOT_IMPLEMENTED",
+    "env_creation": "IMPLEMENTED",
+    "native_build": "IMPLEMENTED_TINY_RDNA4_NN_ONLY",
+    "nerfacc_install": "IMPLEMENTED_AUTHORIZED_HASH_LOCKED_WHEEL",
+    "nerfstudio_install": "IMPLEMENTED_LOCKED_SOURCE_SCOPED_RUNTIME",
+    "network_downloads": "PINNED_PYPI_BUILD_BASE_PYTORCH_INDEX_LOCKED_GIT_COMMITS_AND_HASHED_VISER_WHEEL",
+    "p0_p1": "NOT_IMPLEMENTED",
+    "stage": "QUALIFIED_NERFACC_AND_NERFSTUDIO_SCOPED_RUNTIME",
+    "torch_install": "IMPLEMENTED_WITH_EXACT_RUNTIME_AND_GPU_PROBE"
   },
   "nerfacc_wheel": {
+    "availability": "AUTHORIZED_CACHE_OR_EXPLICIT_LOCAL_PATH_PENDING_RELEASE_URL",
     "filename": "nerfacc-0.5.2-cp312-cp312-linux_x86_64.whl",
-    "sha256": "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00",
     "installed_native_relative_path": "nerfacc/csrc.so",
     "installed_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
+    "python_dependencies": {
+      "Pygments": "2.20.0",
+      "markdown-it-py": "4.2.0",
+      "mdurl": "0.1.2",
+      "rich": "14.3.4"
+    },
+    "qualification": [
+      "WHEEL_SHA256",
+      "INSTALLED_NATIVE_SHA256",
+      "ENVIRONMENT_AWARE_LDD",
+      "GFX1201_CODE_OBJECT",
+      "IMPORT",
+      "PIP_CHECK"
+    ],
     "release_asset_url": null,
-    "availability": "V1_5_RELEASE_ASSET_PENDING"
+    "sha256": "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00",
+    "source_provenance": {
+      "build_command": "PYTORCH_ROCM_ARCH=gfx1201 MAX_JOBS=1 python3 -m pip wheel .",
+      "commit": "d84cdf3afd7dcfc42150e0f0506db58a5ce62812",
+      "license": "MIT",
+      "patch": "apply_nerfacc_rocm72_vector_math_compat_v1.py",
+      "public_release_asset": "AUTHORIZED",
+      "tag": "v0.5.2",
+      "tree": "f24a2f9902143b75ecb8472199b07dd0e92679e8",
+      "url": "https://github.com/nerfstudio-project/nerfacc.git"
+    }
+  },
+  "nerfstudio_source": {
+    "commit": "50e0e3c70c775e89333256213363badbf074f29d",
+    "install_mode": "LOCKED_SOURCE_PLUS_MANAGED_PTH",
+    "mlp_relative_path": "nerfstudio/field_components/mlp.py",
+    "mlp_sha256": "4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad",
+    "scope": "NERFACTO_P0_P1_VIEWER_RUNTIME_DISABLED",
+    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e",
+    "url": "https://github.com/nerfstudio-project/nerfstudio.git"
+  },
+  "nonclaims": [
+    "FULL_NERFSTUDIO_DEPENDENCY_SET",
+    "VIEWER_SERVER_RUNTIME",
+    "OPEN3D_COLMAP_OR_DATA_PROCESSING_FEATURE_COVERAGE",
+    "TRANSITIVE_PYPI_WHEEL_IDENTITY_BEFORE_WHEELHOUSE_LOCK",
+    "P0_P1_EXECUTION_IN_DEV4"
+  ],
+  "path_contract": {
+    "cache": "cache",
+    "dataset": "datasets/quick-validation-dataset-v2",
+    "logs": "logs",
+    "managed_env": "venv",
+    "nerfstudio_source": "sources/nerfstudio",
+    "project_repository": "amd-nerfstudio-rocm72-gfx1201",
+    "reports": "reports",
+    "tiny_rdna4_build": "build/tiny-rdna4-nn",
+    "tiny_rdna4_runtime": "runtime/tiny-rdna4-nn",
+    "tiny_rdna4_source": "sources/tiny-rdna4-nn",
+    "workdir_default": "INSTALLER_DIRECTORY_UNLESS_RUNNING_FROM_PROJECT_REPOSITORY"
+  },
+  "privilege_policy": {
+    "automatic_apt": false,
+    "automatic_sudo": false,
+    "missing_host_packages": "PRINT_COMMAND_AND_EXIT_BLOCKED",
+    "root_execution": "BLOCKED"
+  },
+  "public_math_dependencies": {
+    "viser_transforms": {
+      "allowed_surface": "viser.transforms",
+      "distribution": "viser",
+      "install_mode": "NO_DEPS_MATH_ONLY",
+      "rich_constraint": "rich>=13.3.3,<15.0.0",
+      "version": "1.0.0",
+      "viewer_construction": "FAIL_CLOSED",
+      "wheel_filename": "viser-1.0.0-py3-none-any.whl",
+      "wheel_sha256": "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb"
+    }
+  },
+  "quick_validation_dataset_v2": {
+    "archive_sha256": "0a968da041884f1f815bc9176aef1a13dc72beb7531e25c5c98cf24db1db25ac",
+    "manifest_sha256": "c65f1858a7d5ccfd5ed8fc453e1230cab9c588837b5f045c613c8ec36fd15746",
+    "provenance_sha256": "915a2d6c125606c655c5bdb096bf685fba37d2f3175767e37306f9a7998329e4",
+    "release_asset_url": null,
+    "release_filename": "quick-validation-dataset-v2.tar.gz",
+    "repository_relative_path": "assets/quick-validation-dataset-v2",
+    "transforms_sha256": "38004443c9c89e44e2cb66457d949c183189d914caf4a10c0dfa81a095727807"
+  },
+  "rocm_pytorch": {
+    "expected_architecture": "gfx1201",
+    "expected_hip": "7.2.53211",
+    "external_explicit_env": "VERIFY_ONLY_NO_INSTALL",
+    "index": "https://download.pytorch.org/whl/rocm7.2",
+    "packages": {
+      "torch": "2.13.0+rocm7.2",
+      "torchvision": "0.28.0+rocm7.2"
+    },
+    "qualification": [
+      "PACKAGE_VERSIONS",
+      "ROCM_BUILD",
+      "HIP_VERSION",
+      "GPU_VISIBLE",
+      "GFX1201",
+      "REAL_GPU_MATMUL",
+      "PIP_CHECK"
+    ]
+  },
+  "schema": "amd-nerfstudio-public-installer-resources-v1-5",
+  "scope": "MANAGED_GFX1201_NERFACTO_P0_P1_RUNTIME_INSTALLER",
+  "scoped_nerfstudio_runtime": {
+    "constraints": "constraints/nerfacto_rocm72_py312_v1.txt",
+    "constraints_sha256": "61620e3b841fce3852844ea3bc4bbe6e48363d7317399d88759266822afb0fe0",
+    "full_distribution_install": false,
+    "opencv_policy": {
+      "forbidden": "opencv-python",
+      "required": "opencv-python-headless==4.10.0.84"
+    },
+    "reason": "Avoid declaring unsupported full Nerfstudio optional dependencies while exposing the qualified source runtime.",
+    "requirements": "requirements/nerfacto_runtime_v1.txt",
+    "requirements_sha256": "4ad71a9da2d0023ce36b302da3f0f18a6c27cf2b51919e5c953e45ff3175d621",
+    "source_registration": "00_amd_nerfstudio_rdna4_runtime.pth"
+  },
+  "target": {
+    "architecture": "gfx1201",
+    "hip": "7.2.53211",
+    "python_major_minor": "3.12",
+    "rocm_default_path": "/opt/rocm",
+    "torch": "2.13.0+rocm7.2",
+    "torchvision": "0.28.0+rocm7.2",
+    "viser_math": "1.0.0"
   },
   "tiny_rdna4_nn": {
-    "url": "https://github.com/Painter3000/tiny-rdna4-nn.git",
-    "tag": "phase4a2-model-b-public-gfx1201-pass",
+    "build_environment": {
+      "PYTORCH_ROCM_ARCH": "gfx1201",
+      "ROCM_TOOLCHAIN": "DIRECT_CLANG_VIA_PHASE4A_HIPCC_COMPAT_SHIM",
+      "TCNN_ENABLE_ROCWMMA_WIDTH64_MLP": "1",
+      "TCNN_HALF_PRECISION": "1"
+    },
+    "build_mode": "LOCAL_NATIVE_SOURCE_BUILD",
+    "build_scope": "TINY_RDNA4_NN_ONLY_NO_AMD_GSPLAT_BUILD",
+    "clone_mode": "RECURSIVE",
     "commit": "b98bdcc6b2878f6cb6c10a2141e50867cec6d96a",
     "commit_lock_status": "LOCKED_TO_QUALIFIED_PUBLIC_TAG_COMMIT",
-    "clone_mode": "RECURSIVE",
-    "build_mode": "LOCAL_NATIVE_SOURCE_BUILD",
-    "python_extension_glob": "tinycudann_bindings/_120_C.cpython-312-x86_64-linux-gnu.so",
+    "dynamic_link_audit": {
+      "bare_ldd": "DIAGNOSTIC_ONLY",
+      "gating_ldd": "LD_LIBRARY_PATH_INCLUDES_SELECTED_ENV_TORCH_LIB_AND_REQUESTED_ROCM_LIB",
+      "reason": "PyTorch shared libraries are environment-local and are not discoverable by a bare ldd invocation."
+    },
     "fixed_output_sha256_required": false,
+    "python_extension_glob": "tinycudann_bindings/_120_C.cpython-312-x86_64-linux-gnu.so",
     "required_attestation": [
       "SOURCE_TAG_AND_COMMIT",
       "SUBMODULE_GITLINKS",
@@ -84,72 +209,8 @@
       "LOCAL_SHA256_RECORD"
     ],
     "runtime_marker": ".amd-nerfstudio-tiny-runtime-v1.json",
-    "build_scope": "TINY_RDNA4_NN_ONLY_NO_AMD_GSPLAT_BUILD",
-    "build_environment": {
-      "PYTORCH_ROCM_ARCH": "gfx1201",
-      "TCNN_HALF_PRECISION": "1",
-      "TCNN_ENABLE_ROCWMMA_WIDTH64_MLP": "1",
-      "ROCM_TOOLCHAIN": "DIRECT_CLANG_VIA_PHASE4A_HIPCC_COMPAT_SHIM"
-    },
-    "dynamic_link_audit": {
-      "bare_ldd": "DIAGNOSTIC_ONLY",
-      "gating_ldd": "LD_LIBRARY_PATH_INCLUDES_SELECTED_ENV_TORCH_LIB_AND_REQUESTED_ROCM_LIB",
-      "reason": "PyTorch shared libraries are environment-local and are not discoverable by a bare ldd invocation."
-    }
+    "tag": "phase4a2-model-b-public-gfx1201-pass",
+    "url": "https://github.com/Painter3000/tiny-rdna4-nn.git"
   },
-  "quick_validation_dataset_v2": {
-    "repository_relative_path": "assets/quick-validation-dataset-v2",
-    "release_filename": "quick-validation-dataset-v2.tar.gz",
-    "release_asset_url": null,
-    "archive_sha256": "0a968da041884f1f815bc9176aef1a13dc72beb7531e25c5c98cf24db1db25ac",
-    "transforms_sha256": "38004443c9c89e44e2cb66457d949c183189d914caf4a10c0dfa81a095727807",
-    "provenance_sha256": "915a2d6c125606c655c5bdb096bf685fba37d2f3175767e37306f9a7998329e4",
-    "manifest_sha256": "c65f1858a7d5ccfd5ed8fc453e1230cab9c588837b5f045c613c8ec36fd15746"
-  },
-  "implementation_stage": {
-    "stage": "QUALIFIED_ROCM_PYTORCH_AND_TINY_NATIVE_BUILD",
-    "network_downloads": "PINNED_PYPI_BUILD_BASE_PYTORCH_INDEX_AND_LOCKED_GIT_TAG",
-    "env_creation": "IMPLEMENTED",
-    "torch_install": "IMPLEMENTED_WITH_EXACT_RUNTIME_AND_GPU_PROBE",
-    "native_build": "IMPLEMENTED_TINY_RDNA4_NN_ONLY",
-    "nerfacc_install": "NOT_IMPLEMENTED",
-    "nerfstudio_install": "NOT_IMPLEMENTED",
-    "p0_p1": "NOT_IMPLEMENTED"
-  },
-  "environment_bootstrap": {
-    "mode": "MANAGED_ENV_CREATE_OR_REFRESH",
-    "explicit_external_env": "VERIFY_ONLY_NO_MODIFICATION",
-    "managed_marker": ".amd-nerfstudio-managed-v1.json",
-    "public_index": "https://pypi.org/simple",
-    "packages": {
-      "pip": "26.1.2",
-      "setuptools": "83.0.0",
-      "wheel": "0.47.0",
-      "packaging": "26.2",
-      "ninja": "1.13.0",
-      "cmake": "4.4.0"
-    },
-    "failure_cleanup": "REMOVE_ONLY_ENV_CREATED_BY_CURRENT_INVOCATION_WHILE_MARKED_INCOMPLETE",
-    "activation_required": false,
-    "python_invocation": "ENV_ROOT/bin/python"
-  },
-  "rocm_pytorch": {
-    "index": "https://download.pytorch.org/whl/rocm7.2",
-    "packages": {
-      "torch": "2.13.0+rocm7.2",
-      "torchvision": "0.28.0+rocm7.2"
-    },
-    "expected_hip": "7.2.53211",
-    "expected_architecture": "gfx1201",
-    "external_explicit_env": "VERIFY_ONLY_NO_INSTALL",
-    "qualification": [
-      "PACKAGE_VERSIONS",
-      "ROCM_BUILD",
-      "HIP_VERSION",
-      "GPU_VISIBLE",
-      "GFX1201",
-      "REAL_GPU_MATMUL",
-      "PIP_CHECK"
-    ]
-  }
+  "version": "1.5.0-dev4"
 }
