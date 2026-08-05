@@ -2,6 +2,67 @@
 
 Community integration, qualification and reproducibility project for running the **Nerfacto training chain from Nerfstudio** on AMD RDNA4 / `gfx1201` with ROCm 7.2, PyTorch ROCm, `tiny-rdna4-nn`, and a ROCm-compatible `nerfacc` runtime.
 
+<!-- BEGIN PUBLIC_INSTALLER_V1_5_0_RELEASE -->
+## Public Installer v1.5.0 — qualified P0/P1 release
+
+> [!NOTE]
+> This is the current public release path for the qualified Nerfacto training
+> chain on AMD Radeon AI PRO R9700 / RDNA4 (`gfx1201`) with ROCm 7.2.
+
+```text
+PUBLIC_INSTALLER_V1_5_0: QUALIFIED
+TARGET: AMD Radeon AI PRO R9700 / gfx1201
+PYTHON: 3.12.3
+PYTORCH: 2.13.0+rocm7.2
+HIP: 7.2.53211
+PUBLIC_P0_P1_GATES: 28/28 PASS
+FAILED_GATES: 0
+REPLACEMENT_RUNS: NONE
+P2_EXECUTION: NOT_RUN
+P2_POLICY: MAINTAINER_ONLY
+```
+
+Qualified anchors:
+
+```text
+Implementation commit:
+d73e72615bba404dc8e6b105674890f4abcb6311
+
+Implementation tree:
+787e8e296e55cccc2b0df21106ecb951a9d9f343
+
+Qualification freeze commit:
+d9555c83183c89bf9e9a79fc77cc1c0c6b9d6c16
+
+Main merge commit:
+117d625d8925c90f99222f18a0cb22eec90b31fa
+
+Qualification run:
+20260805T092040Z_43673
+
+Evidence archive SHA-256:
+9f104f5fac3b434852e0f31483cd2b421964654641b8454666c8f6911c53556c
+```
+
+The qualified run demonstrated a real DataLoader batch, Nerfacto forward and
+finite loss, backward with finite nonzero gradients, an optimizer parameter
+update, checkpoint write and hashing, exact reload in a fresh process, and a
+fresh-process resume step. The spawned DataLoader worker used the attested
+`public_nerfacto_config_v1.public_spawn_worker_init` hook.
+
+Release documentation:
+
+- [`docs/PUBLIC_INSTALLER_V1_5.md`](docs/PUBLIC_INSTALLER_V1_5.md)
+- [`docs/PUBLIC_INSTALLER_V1_5_DEV5.md`](docs/PUBLIC_INSTALLER_V1_5_DEV5.md)
+- [`docs/PUBLIC_INSTALLER_V1_5_DEV5F_QUALIFICATION.md`](docs/PUBLIC_INSTALLER_V1_5_DEV5F_QUALIFICATION.md)
+- [`config/public_installer_v1_5_dev5f_qualification.json`](config/public_installer_v1_5_dev5f_qualification.json)
+
+The qualification is scoped to the pinned `gfx1201` P0/P1 mechanics. It does
+not claim full Nerfstudio feature coverage, Viewer or Splatfacto support,
+multi-GPU support, production reconstruction quality, sustained P2 stability,
+or performance superiority over CUDA/NVIDIA.
+<!-- END PUBLIC_INSTALLER_V1_5_0_RELEASE -->
+
 <!-- BEGIN NERFSTUDIO_EXPLAINER_AND_VALIDATION_STAGES -->
 ## What Is Nerfstudio — and Why Does This Repository Exist?
 
@@ -56,17 +117,20 @@ real-world use.
 It brings the qualified **Nerfacto training path to AMD RDNA4 (`gfx1201`) using
 ROCm 7.2 — without CUDA and without an NVIDIA GPU.**
 
-The current public adaptive-installer qualification covers:
+The current public Installer v1.5.0 qualification covers:
 
 ```text
-AMD RDNA4 / gfx1201 runtime: PASS
-Adaptive existing-environment reuse: PASS
-Selected environment unchanged: PASS
-pip freeze unchanged: PASS
-P0 preflight: PASS
-P1 real Nerfacto mechanics: PASS
-Checkpoint verification: PASS
-Evidence manifest chain: PASS
+Managed AMD RDNA4 / gfx1201 runtime: PASS
+Pinned ROCm PyTorch stack: PASS
+Pinned tiny-rdna4-nn runtime: PASS
+Hash-attested nerfacc runtime: PASS
+Synthetic dataset deployment: PASS
+PortableMLP policy: PASS
+Pillow encoder-extents compatibility: PASS
+Spawn-worker compatibility hook: PASS
+P0/P1 gates: 28/28 PASS
+Checkpoint write/reload/resume: PASS
+P2 sustained validation: NOT_RUN / MAINTAINER_ONLY
 ```
 
 ### What do P0, P1, and P2 mean?
@@ -111,26 +175,29 @@ They refer to **two different qualification runs**:
    That frozen run executed 576 training steps across the defined continuous
    and split/resume trajectories, so the top-level project status correctly
    reports `A5-P2: PASS`.
-2. The later public Adaptive Installer v1.4.3 qualification intentionally
-   reused an existing environment and repeated only the short public P0+P1
-   path. It did not rerun the maintainer-only P2 stage or a separate
-   long-duration training campaign.
+2. The public Installer v1.5.0 qualification executed the real short P0+P1
+   path with the managed runtime, dataset deployment, PortableMLP policy,
+   Pillow compatibility, and the spawned DataLoader worker hook. It did not
+   rerun the maintainer-only P2 stage or a separate long-duration campaign.
 
-The adaptive-installer evidence therefore states:
+The v1.5.0 qualification evidence therefore states:
 
 ```text
-P2_SUSTAINED_VALIDATION: NOT_RUN
+P2_EXECUTION: NOT_RUN
+P2_POLICY: MAINTAINER_ONLY
 LONG_DURATION_TRAINING: NOT_RUN
 ```
 
-`NOT_RUN` does not mean `FAIL`. It means that this specific validation run did
-not execute that stage and therefore does not claim it as newly passed.
+`NOT_RUN` does not mean `FAIL`. It means that this specific public release
+qualification did not execute that stage and therefore does not claim it as a
+new P2 pass.
 
 The two statements are not contradictory: the historical canonical A5-P2
-freeze remains `PASS`, while the separate public v1.4.3 adaptive-installer
-qualification is scoped to P0+P1.
+freeze remains `PASS`, while the separate public Installer v1.5.0
+qualification is scoped to P0+P1. The earlier v1.4.3 adaptive qualification is
+retained below as historical public evidence.
 
-The following are not claimed by the public v1.4.3 adaptive-installer run:
+The following are not claimed by the public Installer v1.5.0 qualification:
 
 - real GPU qualification of a separately created Fresh-ENV;
 - a new P2 sustained-training qualification;
@@ -159,7 +226,7 @@ The following are not claimed by the public v1.4.3 adaptive-installer run:
 - Runtime path: `tiny-rdna4-nn`, PyTorch ROCm, and a ROCm-compatible `nerfacc` extension.
 - Qualified scope: Nerfacto training, checkpointing, reload, resume, and validation — **not full Nerfstudio support**.
 - Canonical A5-P2 qualification: `PASS` with 576 frozen training steps.
-- Public Adaptive Installer v1.4.3 qualification: existing-environment reuse plus real P0+P1 validation.
+- Public Installer v1.5.0 qualification: managed runtime plus real 28/28-gate P0+P1 validation.
 - Viewer, Splatfacto, multi-GPU, Fresh-ENV GPU execution, and CUDA performance superiority are not claimed.
 - License and attribution: see [`LICENSE`](./LICENSE) and [`NOTICE.md`](./NOTICE.md). Third-party components retain their original licenses.
 
@@ -246,21 +313,34 @@ Checkpoint state integrity and resumed trajectory behavior were separate gates:
 | Training rays per batch | 1024 |
 | Qualification dataset | 6 images at 128×128 |
 
-Runtime anchors:
+Public Installer v1.5.0 runtime anchors:
 
 ```text
 Nerfstudio mlp.py
 4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad
 
 tiny-rdna4-nn native extension
-883f89efdad7bb909a4a3899ab79b2defe9713fdb5c7cf22cf4882c626b3efc4
+4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917
 
 tinycudann/modules.py
-b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12
+6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a
 
 ROCm-compatible nerfacc native extension
 d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2
 ```
+
+Historical canonical A5 runtime anchors:
+
+```text
+tiny-rdna4-nn native extension
+883f89efdad7bb909a4a3899ab79b2defe9713fdb5c7cf22cf4882c626b3efc4
+
+tinycudann/modules.py
+b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12
+```
+
+The historical A5 hashes remain part of the earlier frozen correctness chain;
+they are not rewritten as v1.5.0 runtime identities.
 
 ## Claim boundary
 
@@ -280,16 +360,61 @@ Not claimed:
 - performance superiority over CUDA/NVIDIA;
 - cross-host or cross-checkout binary identity unless separately demonstrated.
 
-## Public Toolchain v1.4.3
+## Public Installer v1.5.0
 
-Public Toolchain v1.4.3 combines the normal-user validation runners, the strict
-Fresh-ENV fallback, and the qualified adaptive existing-environment path into
-one current workflow.
+The v1.5.0 workflow separates runtime installation from the final real P0/P1
+qualification. The installer operates below an explicit user-controlled
+`--workdir`, never executes `sudo` or `apt`, and modifies only its managed
+environment and project-owned runtime directories.
 
-Older v1.2 and v1.3.2 headings are retained in [`CHANGELOG.md`](CHANGELOG.md)
-and the detailed documentation. Their functionality remains part of the current
-toolchain; users do not need to choose between three separate toolchain
-versions.
+### Managed runtime installation
+
+A complete managed installation with an explicit authorized nerfacc wheel uses:
+
+```bash
+scripts/setup_public_installer_v1_5.sh \
+  --workdir "$HOME/amd-nerfstudio-workdir" \
+  --rocm-path /opt/rocm \
+  --arch gfx1201 \
+  --validation quick \
+  --prepare-env \
+  --install-torch \
+  --build-tiny \
+  --install-nerfacc \
+  --nerfacc-wheel /path/to/nerfacc-0.5.2-cp312-cp312-linux_x86_64.whl \
+  --install-nerfstudio
+```
+
+The authorized nerfacc wheel must match SHA-256
+`252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00`.
+The installer can reuse an already qualified managed runtime, but an explicitly
+selected external environment remains verify-only and is never repaired in
+place.
+
+### Real public P0/P1 qualification
+
+After the runtime and the hash-locked dataset archive are available, set the
+six explicit paths and run the fixed 28-gate protocol:
+
+```bash
+export NERFSTUDIO_RDNA4_PUBLIC_PYTHON=/path/to/venv/bin/python
+export NERFSTUDIO_RDNA4_PUBLIC_NERFSTUDIO_WORKTREE=/path/to/nerfstudio
+export NERFSTUDIO_RDNA4_PUBLIC_TCNN_RUNTIME=/path/to/tiny-rdna4-nn-runtime
+export NERFSTUDIO_RDNA4_PUBLIC_DATASET_ARCHIVE=/path/to/quick-validation-dataset-v2.tar.gz
+export NERFSTUDIO_RDNA4_PUBLIC_DATASET=/path/to/quick-validation-dataset-v2
+export NERFSTUDIO_RDNA4_PUBLIC_OUTPUT_ROOT=/path/to/evidence
+scripts/run_public_dev5_p0_p1_v1.sh
+```
+
+The quick-validation dataset archive must match SHA-256
+`0a968da041884f1f815bc9176aef1a13dc72beb7531e25c5c98cf24db1db25ac`.
+P2 is never launched automatically.
+
+### Previous public workflows — Toolchain v1.4.3
+
+The v1.4.3 adaptive existing-environment path and strict Fresh-ENV fallback
+remain available as earlier public workflows. Older v1.2 and v1.3.2 headings
+are retained in [`CHANGELOG.md`](CHANGELOG.md) and the detailed documentation.
 
 ### Recommended path — adaptive existing environment
 
@@ -384,8 +509,40 @@ produce a separate public requalification chain on each host.
 
 See [Public Toolchain v1](docs/PUBLIC_TOOLCHAIN_V1.md).
 
+<!-- BEGIN PUBLIC_INSTALLER_V1_5_0_PUBLIC_QUALIFICATION -->
+### Current public qualification — v1.5.0
+
+Public Installer v1.5.0 completed the fixed real P0/P1 qualification on AMD
+Radeon AI PRO R9700 / `gfx1201` against implementation commit
+`d73e72615bba404dc8e6b105674890f4abcb6311` and tree
+`787e8e296e55cccc2b0df21106ecb951a9d9f343`.
+
+The run deployed and verified the public synthetic dataset, attested the pinned
+sources and native runtimes, exercised the real spawned DataLoader worker,
+completed forward, backward, optimizer update, checkpoint write, exact
+fresh-process reload, and fresh-process resume, and passed all 28 declared
+gates.
+
+```text
+PUBLIC_INSTALLER_V1_5_0_P0_P1_QUALIFICATION: PASS
+PUBLIC_RDNA4_DEV5_P0_P1: PASS
+DEV5F_28_GATE_CONTRACT: PASS
+PASSED_GATES: 28
+FAILED_GATES: 0
+REPLACEMENT_RUNS: NONE
+P2_EXECUTION: NOT_RUN
+```
+
+Qualification run: `20260805T092040Z_43673`
+Evidence SHA-256:
+`9f104f5fac3b434852e0f31483cd2b421964654641b8454666c8f6911c53556c`
+
+See the [final qualification report](docs/PUBLIC_INSTALLER_V1_5_DEV5F_QUALIFICATION.md)
+and the [machine-readable qualification contract](config/public_installer_v1_5_dev5f_qualification.json).
+<!-- END PUBLIC_INSTALLER_V1_5_0_PUBLIC_QUALIFICATION -->
+
 <!-- BEGIN ADAPTIVE_INSTALLER_V1_4_3_PUBLIC_QUALIFICATION -->
-### Current public qualification
+### Previous public qualification — v1.4.3
 
 Public Toolchain v1.4.3 completed a real adaptive-reuse qualification on the
 AMD Radeon AI PRO R9700 against implementation commit
@@ -415,6 +572,10 @@ See [the sanitized qualification evidence](evidence-public/ADAPTIVE_INSTALLER_V1
 
 ## Documentation
 
+- [Public Installer v1.5](docs/PUBLIC_INSTALLER_V1_5.md)
+- [Public Installer v1.5 Dev5 protocol](docs/PUBLIC_INSTALLER_V1_5_DEV5.md)
+- [Public Installer v1.5 final P0/P1 qualification](docs/PUBLIC_INSTALLER_V1_5_DEV5F_QUALIFICATION.md)
+- [Public Installer v1.5 machine-readable qualification](config/public_installer_v1_5_dev5f_qualification.json)
 - [Qualification scope](docs/QUALIFICATION_SCOPE.md)
 - [A5 validation chain](docs/A5_VALIDATION_CHAIN.md)
 - [Recovery history](docs/RECOVERY_HISTORY.md)
