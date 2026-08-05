@@ -4,17 +4,18 @@ from __future__ import annotations
 import argparse
 import json
 import os
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 import platform
 import shutil
 import subprocess
 import sys
 import sysconfig
 import tempfile
+import zipfile
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev4a"
+VERSION = "1.5.0-dev4b"
 SCHEMA = "amd-nerfstudio-public-installer-v1-5-nerfacc-nerfstudio"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
@@ -82,6 +83,10 @@ VISER_WHEEL_SHA256 = "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70
 SCOPED_RUNTIME_REQUIREMENTS = "requirements/nerfacto_runtime_v1.txt"
 SCOPED_RUNTIME_CONSTRAINTS = "constraints/nerfacto_rocm72_py312_v1.txt"
 RUNTIME_PTH_FILENAME = "00_amd_nerfstudio_rdna4_runtime.pth"
+VISER_MATH_RUNTIME_DIRNAME = "viser-math-only-v1"
+VISER_MATH_MARKER = ".amd-nerfstudio-viser-math-only-v1.json"
+VISER_MATH_MARKER_SCHEMA = "amd-nerfstudio-viser-math-only-v1"
+VISER_MATH_PREFIX = "viser/transforms/"
 
 
 def run_command(
@@ -209,6 +214,7 @@ def derive_paths(script_path: Path, workdir: Path, env_path: Path | None) -> dic
         "tiny_source": workdir / "sources" / "tiny-rdna4-nn",
         "tiny_build": workdir / "build" / "tiny-rdna4-nn",
         "tiny_runtime": workdir / "runtime" / "tiny-rdna4-nn",
+        "viser_math_runtime": workdir / "runtime" / VISER_MATH_RUNTIME_DIRNAME,
         "env": env,
         "dataset": workdir / "datasets" / "quick-validation-dataset-v2",
         "cache": workdir / "cache",
@@ -733,23 +739,16 @@ raise SystemExit(0 if payload["passed"] else 2)
 
 
 
-def evaluate_pip_check(process: dict[str, Any], allow_viser_math_only: bool = True) -> dict[str, Any]:
+def evaluate_pip_check(process: dict[str, Any]) -> dict[str, Any]:
     text = "\n".join(
         part for part in (process.get("stdout", ""), process.get("stderr", "")) if part
     )
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    allowed: list[str] = []
-    rejected: list[str] = []
-    for line in lines:
-        if allow_viser_math_only and line.lower().startswith(f"viser {VISER_VERSION} "):
-            allowed.append(line)
-        elif line != "No broken requirements found.":
-            rejected.append(line)
-    passed = process.get("returncode") == 0 or (bool(allowed) and not rejected)
+    rejected = [line for line in lines if line != "No broken requirements found."]
+    passed = process.get("returncode") == 0 and not rejected
     return {
         "passed": passed,
         "returncode": process.get("returncode"),
-        "allowed": allowed,
         "rejected": rejected,
         "process": process,
     }
@@ -990,7 +989,7 @@ def compose_runtime_library_path(
 def probe_torch_library_dir(python: Path) -> dict[str, Any]:
     code = r'''
 from importlib.util import find_spec
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 spec = find_spec("torch")
 if spec is None or spec.origin is None:
@@ -1621,13 +1620,191 @@ def cache_viser_wheel(report: dict[str, Any], python: Path) -> dict[str, Any]:
     return {"passed": True, "status": "READY", "reason": "QUALIFIED_VISER_WHEEL_DOWNLOADED", "path": str(wheel), "sha256": observed, "modified": True, "process": process}
 
 
-def write_runtime_pth(python: Path, tiny_runtime: Path, nerfstudio_source: Path) -> dict[str, Any]:
+def viser_math_member_names(wheel: Path) -> dict[str, Any]:
+    if not wheel.is_file():
+        return {"passed": False, "reason": "VISER_WHEEL_MISSING", "wheel": str(wheel)}
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            names = archive.namelist()
+    except Exception as exc:
+        return {"passed": False, "reason": "VISER_WHEEL_OPEN_FAILED", "error": repr(exc), "wheel": str(wheel)}
+    members: list[str] = []
+    rejected: list[str] = []
+    for name in names:
+        if not name.startswith(VISER_MATH_PREFIX) or name.endswith("/"):
+            continue
+        pure = PurePosixPath(name)
+        if pure.is_absolute() or ".." in pure.parts:
+            rejected.append(name)
+            continue
+        if pure.suffix not in {".py", ".pyi"} and pure.name != "py.typed":
+            rejected.append(name)
+            continue
+        members.append(name)
+    members = sorted(set(members))
+    required = {
+        "viser/transforms/__init__.py",
+        "viser/transforms/_base.py",
+        "viser/transforms/_se2.py",
+        "viser/transforms/_se3.py",
+        "viser/transforms/_so2.py",
+        "viser/transforms/_so3.py",
+    }
+    missing = sorted(required - set(members))
+    return {
+        "passed": not rejected and not missing,
+        "wheel": str(wheel),
+        "members": members,
+        "rejected": rejected,
+        "missing": missing,
+    }
+
+
+def verify_viser_math_runtime(runtime: Path) -> dict[str, Any]:
+    marker_path = runtime / VISER_MATH_MARKER
+    if not marker_path.is_file():
+        return {"passed": False, "reason": "VISER_MATH_MARKER_MISSING", "runtime": str(runtime)}
+    try:
+        marker = json.loads(marker_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        return {"passed": False, "reason": "VISER_MATH_MARKER_INVALID", "error": repr(exc), "runtime": str(runtime)}
+    files = marker.get("files") if isinstance(marker.get("files"), dict) else {}
+    checks = {
+        "schema": marker.get("schema") == VISER_MATH_MARKER_SCHEMA,
+        "version": marker.get("version") == VISER_VERSION,
+        "source_wheel_sha256": marker.get("source_wheel_sha256") == VISER_WHEEL_SHA256,
+        "file_manifest": bool(files),
+        "package_init": "viser/__init__.py" in files,
+        "transforms_init": "viser/transforms/__init__.py" in files,
+        "license": "LICENSE" in files,
+    }
+    observed_files = {
+        str(path.relative_to(runtime))
+        for path in runtime.rglob("*")
+        if path.is_file() and path.name != VISER_MATH_MARKER
+    } if runtime.is_dir() else set()
+    checks["no_unexpected_files"] = observed_files == set(files)
+    mismatches: list[dict[str, str | None]] = []
+    for rel, expected in sorted(files.items()):
+        target = runtime / rel
+        observed = sha256_file(target) if target.is_file() else None
+        if observed != expected:
+            mismatches.append({"path": rel, "expected": expected, "observed": observed})
+    checks["file_hashes"] = not mismatches
+    return {
+        "passed": all(checks.values()),
+        "runtime": str(runtime),
+        "marker": marker,
+        "checks": checks,
+        "mismatches": mismatches,
+    }
+
+
+def deploy_viser_math_runtime(report: dict[str, Any], wheel: Path) -> dict[str, Any]:
+    runtime = Path(report["paths"]["viser_math_runtime"])
+    existing = verify_viser_math_runtime(runtime)
+    if existing.get("passed"):
+        return {
+            "passed": True,
+            "status": "READY",
+            "reason": "QUALIFIED_VISER_MATH_RUNTIME_REUSED",
+            "runtime": str(runtime),
+            "modified": False,
+            "verification": existing,
+        }
+    if runtime.exists():
+        return {
+            "passed": False,
+            "status": "BLOCKED",
+            "reason": "EXISTING_VISER_MATH_RUNTIME_UNVERIFIED",
+            "runtime": str(runtime),
+            "verification": existing,
+        }
+    if sha256_file(wheel) != VISER_WHEEL_SHA256:
+        return {"passed": False, "status": "BLOCKED", "reason": "VISER_WHEEL_SHA256_MISMATCH", "wheel": str(wheel)}
+    selection = viser_math_member_names(wheel)
+    if not selection.get("passed"):
+        return {"passed": False, "status": "BLOCKED", "reason": "VISER_MATH_MEMBER_CONTRACT_FAILED", "selection": selection}
+    staging = runtime.with_name(runtime.name + f".staging-{os.getpid()}")
+    if staging.exists():
+        shutil.rmtree(staging)
+    staging.mkdir(parents=True)
+    try:
+        with zipfile.ZipFile(wheel) as archive:
+            for name in selection["members"]:
+                rel = PurePosixPath(name)
+                target = staging.joinpath(*rel.parts)
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(archive.read(name))
+            license_names = [
+                name for name in archive.namelist()
+                if PurePosixPath(name).name.upper() in {"LICENSE", "LICENSE.TXT"}
+            ]
+            if not license_names:
+                raise RuntimeError("VISER_LICENSE_MISSING")
+            (staging / "LICENSE").write_bytes(archive.read(sorted(license_names)[0]))
+        package_init = staging / "viser" / "__init__.py"
+        package_init.write_text(
+            '"""Qualified viewer-free Viser transforms surface."""\n'
+            f'__version__ = "{VISER_VERSION}"\n'
+            'from . import transforms as transforms\n',
+            encoding="utf-8",
+        )
+        files = {
+            str(path.relative_to(staging)): sha256_file(path)
+            for path in sorted(staging.rglob("*"))
+            if path.is_file()
+        }
+        marker = {
+            "schema": VISER_MATH_MARKER_SCHEMA,
+            "version": VISER_VERSION,
+            "source_wheel": str(wheel),
+            "source_wheel_sha256": VISER_WHEEL_SHA256,
+            "allowed_surface": "viser.transforms",
+            "viewer_construction": "FAIL_CLOSED",
+            "created_at_utc": datetime.now(timezone.utc).isoformat(),
+            "files": files,
+        }
+        (staging / VISER_MATH_MARKER).write_text(
+            json.dumps(marker, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        verification = verify_viser_math_runtime(staging)
+        if not verification.get("passed"):
+            raise RuntimeError("VISER_MATH_RUNTIME_ATTESTATION_FAILED")
+        runtime.parent.mkdir(parents=True, exist_ok=True)
+        os.replace(staging, runtime)
+    except Exception as exc:
+        shutil.rmtree(staging, ignore_errors=True)
+        return {"passed": False, "status": "FAIL", "reason": "VISER_MATH_RUNTIME_DEPLOY_FAILED", "error": repr(exc), "selection": selection}
+    final = verify_viser_math_runtime(runtime)
+    return {
+        "passed": final.get("passed") is True,
+        "status": "READY" if final.get("passed") else "FAIL",
+        "reason": "QUALIFIED_VISER_MATH_RUNTIME_DEPLOYED" if final.get("passed") else "VISER_MATH_RUNTIME_FINAL_ATTESTATION_FAILED",
+        "runtime": str(runtime),
+        "modified": True,
+        "selection": selection,
+        "verification": final,
+    }
+
+def write_runtime_pth(
+    python: Path,
+    tiny_runtime: Path,
+    nerfstudio_source: Path,
+    viser_math_runtime: Path,
+) -> dict[str, Any]:
     site_probe = managed_site_packages(python)
     if not site_probe.get("passed"):
         return {"passed": False, "reason": "MANAGED_SITE_PACKAGES_UNAVAILABLE", "site_probe": site_probe}
     site_path = Path(site_probe["path"])
     target = site_path / RUNTIME_PTH_FILENAME
-    content = f"{tiny_runtime}\n{nerfstudio_source}\n"
+    viser_literal = json.dumps(str(viser_math_runtime.resolve()))
+    content = (
+        f"import sys; p={viser_literal}; sys.path.insert(0, p) if p not in sys.path else None\n"
+        f"{tiny_runtime}\n"
+        f"{nerfstudio_source}\n"
+    )
     changed = not target.is_file() or target.read_text(encoding="utf-8", errors="replace") != content
     if changed:
         temporary = target.with_name(target.name + f".part-{os.getpid()}")
@@ -1656,6 +1833,8 @@ try:
     import torch
     import nerfacc.csrc as nerfacc_csrc
     import tinycudann.modules as tcnn_modules
+    import viser
+    import viser.transforms as viser_transforms
     for name in modules:
         mod = import_module(name)
         payload["modules"].append({"name": name, "file": str(pathlib.Path(mod.__file__).resolve()) if getattr(mod, "__file__", None) else None})
@@ -1669,10 +1848,16 @@ try:
         "tiny_module": str(pathlib.Path(tcnn_modules.__file__).resolve()),
         "tiny_native": str(pathlib.Path(tcnn_modules._C.__file__).resolve()),
         "tiny_native_sha256": hashlib.sha256(pathlib.Path(tcnn_modules._C.__file__).read_bytes()).hexdigest(),
-        "viser_version": metadata.version("viser"),
+        "viser_version": getattr(viser, "__version__", None),
+        "viser_module": str(pathlib.Path(viser.__file__).resolve()),
+        "viser_transforms": str(pathlib.Path(viser_transforms.__file__).resolve()),
         "rich_version": metadata.version("rich"),
         "opencv_headless": metadata.version("opencv-python-headless"),
     })
+    try:
+        payload["viser_distribution"] = metadata.version("viser")
+    except metadata.PackageNotFoundError:
+        payload["viser_distribution"] = None
     try:
         payload["opencv_gui"] = metadata.version("opencv-python")
     except metadata.PackageNotFoundError:
@@ -1708,6 +1893,9 @@ print(json.dumps(payload, sort_keys=True))
         "nerfacc_hash": payload.get("nerfacc_native_sha256") == NERFACC_NATIVE_SHA256,
         "tiny_origin": str(payload.get("tiny_module", "")).startswith(str(Path(report["paths"]["tiny_runtime"]).resolve())),
         "viser": payload.get("viser_version") == VISER_VERSION,
+        "viser_distribution_absent": payload.get("viser_distribution") is None,
+        "viser_origin": str(payload.get("viser_module", "")).startswith(str(Path(report["paths"]["viser_math_runtime"]).resolve())),
+        "viser_transforms_origin": str(payload.get("viser_transforms", "")).startswith(str(Path(report["paths"]["viser_math_runtime"]).resolve())),
         "rich": payload.get("rich_version") == NERFACC_RICH_PINS["rich"],
         "opencv_headless": payload.get("opencv_headless") == "4.10.0.84",
         "opencv_gui_absent": payload.get("opencv_gui") is None,
@@ -1745,17 +1933,25 @@ def install_nerfstudio_runtime(report: dict[str, Any]) -> dict[str, Any]:
     viser = cache_viser_wheel(report, python)
     if not viser.get("passed"):
         return {"passed": False, "status": viser.get("status", "FAIL"), "reason": viser.get("reason"), "source": source_result, "requirements_install": requirements_install, "viser": viser}
-    viser_install = run_command_logged(
-        [str(python), "-m", "pip", "install", "--disable-pip-version-check", "--no-input", "--no-deps", "--force-reinstall", str(viser["path"])],
-        Path(report["paths"]["logs"]) / "installer-v1.5-viser-math-install.log",
+    viser_uninstall = run_command_logged(
+        [str(python), "-m", "pip", "uninstall", "--yes", "viser"],
+        Path(report["paths"]["logs"]) / "installer-v1.5-viser-full-uninstall.log",
         timeout=1800,
         env=env,
     )
-    if viser_install.get("returncode") != 0:
-        return {"passed": False, "status": "FAIL", "reason": "VISER_MATH_INSTALL_FAILED", "source": source_result, "requirements_install": requirements_install, "viser": viser, "viser_install": viser_install}
-    pth = write_runtime_pth(python, Path(report["paths"]["tiny_runtime"]), source)
+    if viser_uninstall.get("returncode") != 0:
+        return {"passed": False, "status": "FAIL", "reason": "VISER_FULL_DISTRIBUTION_UNINSTALL_FAILED", "source": source_result, "requirements_install": requirements_install, "viser": viser, "viser_uninstall": viser_uninstall}
+    viser_math = deploy_viser_math_runtime(report, Path(viser["path"]))
+    if not viser_math.get("passed"):
+        return {"passed": False, "status": viser_math.get("status", "FAIL"), "reason": viser_math.get("reason"), "source": source_result, "requirements_install": requirements_install, "viser": viser, "viser_uninstall": viser_uninstall, "viser_math": viser_math}
+    pth = write_runtime_pth(
+        python,
+        Path(report["paths"]["tiny_runtime"]),
+        source,
+        Path(report["paths"]["viser_math_runtime"]),
+    )
     if not pth.get("passed"):
-        return {"passed": False, "status": "FAIL", "reason": pth.get("reason"), "source": source_result, "requirements_install": requirements_install, "viser": viser, "viser_install": viser_install, "pth": pth}
+        return {"passed": False, "status": "FAIL", "reason": pth.get("reason"), "source": source_result, "requirements_install": requirements_install, "viser": viser, "viser_uninstall": viser_uninstall, "viser_math": viser_math, "pth": pth}
     source_after = verify_nerfstudio_source(source)
     runtime = probe_nerfstudio_runtime(report, source, python)
     pip_check = evaluate_pip_check(run_command([str(python), "-m", "pip", "check"], timeout=600))
@@ -1764,14 +1960,15 @@ def install_nerfstudio_runtime(report: dict[str, Any]) -> dict[str, Any]:
         "passed": passed,
         "status": "READY" if passed else "FAIL",
         "reason": "NERFSTUDIO_SCOPED_RUNTIME_READY" if passed else "NERFSTUDIO_RUNTIME_QUALIFICATION_FAILED",
-        "modified": bool(source_result.get("modified")) or bool(viser.get("modified")) or bool(pth.get("modified")) or True,
+        "modified": bool(source_result.get("modified")) or bool(viser.get("modified")) or bool(viser_math.get("modified")) or bool(pth.get("modified")) or bool(requirements_install.get("returncode") == 0),
         "source": source_result,
         "source_after": source_after,
         "requirements": {"path": str(requirements), "sha256": sha256_file(requirements)},
         "constraints": {"path": str(constraints), "sha256": sha256_file(constraints)},
         "requirements_install": requirements_install,
         "viser": viser,
-        "viser_install": viser_install,
+        "viser_uninstall": viser_uninstall,
+        "viser_math": viser_math,
         "pth": pth,
         "runtime": runtime,
         "pip_check": pip_check,
@@ -1966,6 +2163,8 @@ def self_test() -> int:
             failures.append("managed env path")
         if paths["tiny_source"] != workdir / "sources" / "tiny-rdna4-nn":
             failures.append("tiny source path")
+        if paths["viser_math_runtime"] != workdir / "runtime" / VISER_MATH_RUNTIME_DIRNAME:
+            failures.append("viser math runtime path")
         selection = select_environment(paths, explicit_env=False)
         if selection["action"] != "CREATE_NEW_ENV" or not selection["passed"]:
             failures.append("new env selection")
@@ -2016,14 +2215,16 @@ def self_test() -> int:
         if NERFSTUDIO_TREE != "9d5ff468eeff89b66995e9984acaa378c37dc07e":
             failures.append("nerfstudio tree")
         clean_check = evaluate_pip_check({"returncode": 0, "stdout": "No broken requirements found.\n", "stderr": ""})
-        viser_check = evaluate_pip_check({"returncode": 1, "stdout": "viser 1.0.0 requires yourdfpy, which is not installed.\n", "stderr": ""})
-        if not clean_check["passed"] or not viser_check["passed"]:
-            failures.append("scoped pip check")
+        broken_check = evaluate_pip_check({"returncode": 1, "stdout": "viser 1.0.0 requires yourdfpy, which is not installed.\n", "stderr": ""})
+        if not clean_check["passed"] or broken_check["passed"]:
+            failures.append("strict pip check")
+        if VISER_MATH_MARKER_SCHEMA != "amd-nerfstudio-viser-math-only-v1":
+            failures.append("viser math marker schema")
     payload = {
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 18,
+        "tests": 20,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")

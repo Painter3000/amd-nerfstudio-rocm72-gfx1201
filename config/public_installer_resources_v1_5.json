@@ -108,6 +108,7 @@
     "tiny_rdna4_build": "build/tiny-rdna4-nn",
     "tiny_rdna4_runtime": "runtime/tiny-rdna4-nn",
     "tiny_rdna4_source": "sources/tiny-rdna4-nn",
+    "viser_math_runtime": "runtime/viser-math-only-v1",
     "workdir_default": "INSTALLER_DIRECTORY_UNLESS_RUNNING_FROM_PROJECT_REPOSITORY"
   },
   "privilege_policy": {
@@ -119,9 +120,14 @@
   "public_math_dependencies": {
     "viser_transforms": {
       "allowed_surface": "viser.transforms",
-      "distribution": "viser",
-      "install_mode": "NO_DEPS_MATH_ONLY",
+      "dependency_metadata": "NOT_INSTALLED",
+      "full_distribution": "UNINSTALLED",
+      "install_mode": "HASH_LOCKED_TRANSFORMS_EXTRACTION",
+      "pip_check": "STRICT_NO_ADVISORIES",
       "rich_constraint": "rich>=13.3.3,<15.0.0",
+      "runtime_directory": "runtime/viser-math-only-v1",
+      "runtime_marker_schema": "amd-nerfstudio-viser-math-only-v1",
+      "source_distribution": "viser",
       "version": "1.0.0",
       "viewer_construction": "FAIL_CLOSED",
       "wheel_filename": "viser-1.0.0-py3-none-any.whl",
@@ -212,5 +218,5 @@
     "tag": "phase4a2-model-b-public-gfx1201-pass",
     "url": "https://github.com/Painter3000/tiny-rdna4-nn.git"
   },
-  "version": "1.5.0-dev4a"
+  "version": "1.5.0-dev4b"
 }

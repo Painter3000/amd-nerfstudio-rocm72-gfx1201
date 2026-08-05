@@ -1,8 +1,8 @@
 # Public installer v1.5
 
-> dev4a fixes the report schema so the requested `gfx1201` architecture is
-> preserved at top level and can be reused by the tiny-rdna4-nn, nerfacc, and
-> Nerfstudio runtime verification stages.
+> dev4b deploys a hash-attested, viewer-free `viser.transforms` runtime from
+> the locked Viser 1.0.0 wheel. The full Viser GUI/server distribution is not
+> retained in the managed environment.
 
 The v1.5 installer operates entirely below a user-controlled installation root.
 It does not invoke `sudo`, `apt`, or another operating-system package manager.
@@ -18,6 +18,7 @@ $WORKDIR/
 │   └── tiny-rdna4-nn/
 ├── build/tiny-rdna4-nn/
 ├── runtime/tiny-rdna4-nn/
+├── runtime/viser-math-only-v1/
 ├── datasets/quick-validation-dataset-v2/
 ├── cache/
 ├── reports/
@@ -110,15 +111,19 @@ the complete optional Nerfstudio feature surface. It then registers the locked
 Nerfstudio source and the qualified tiny-rdna4-nn runtime through a managed
 `.pth` file in the selected environment.
 
-`viser==1.0.0` is downloaded as a wheel, verified against SHA256
-`3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb`,
-and installed with `--no-deps`. Only `viser.transforms` belongs to the qualified
-surface. Viewer construction remains fail-closed.
+`viser==1.0.0` is downloaded as a wheel and verified against SHA256
+`3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb`.
+The installer does **not** keep the full Viser distribution installed. It
+extracts only the hash-locked `viser/transforms` Python surface into
+`runtime/viser-math-only-v1`, writes a minimal package initializer and a
+file-hash marker, and places that managed runtime first on `sys.path`. This
+avoids importing Viser's GUI/server initializer and keeps `pip check` strict.
+Viewer construction remains fail-closed.
 
 The scoped runtime requires `opencv-python-headless==4.10.0.84` and rejects the
 GUI `opencv-python` distribution.
 
-## dev4a invocation
+## dev4b invocation
 
 For an installation where the earlier stages are already qualified:
 

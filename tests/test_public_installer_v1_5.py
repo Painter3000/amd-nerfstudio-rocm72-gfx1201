@@ -4,6 +4,7 @@ from __future__ import annotations
 import importlib.util
 from pathlib import Path
 import tempfile
+import zipfile
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +36,7 @@ class PublicInstallerV15Tests(unittest.TestCase):
             self.assertEqual(workdir / "sources" / "tiny-rdna4-nn", paths["tiny_source"])
             self.assertEqual(workdir / "sources" / "nerfstudio", paths["nerfstudio_source"])
             self.assertEqual(workdir / "runtime" / "tiny-rdna4-nn", paths["tiny_runtime"])
+            self.assertEqual(workdir / "runtime" / installer.VISER_MATH_RUNTIME_DIRNAME, paths["viser_math_runtime"])
 
     def test_only_managed_env_is_autodetected(self) -> None:
         with tempfile.TemporaryDirectory() as td:
@@ -209,19 +211,72 @@ class PublicInstallerV15Tests(unittest.TestCase):
         self.assertFalse(result["modified"])
         self.assertEqual("EXPLICIT_EXTERNAL_ENV_IS_VERIFY_ONLY", result["reason"])
 
-    def test_scoped_pip_check_allows_only_viser_advisories(self) -> None:
-        allowed = installer.evaluate_pip_check({
+    def test_scoped_pip_check_is_strict(self) -> None:
+        clean = installer.evaluate_pip_check({
+            "returncode": 0,
+            "stdout": "No broken requirements found.\n",
+            "stderr": "",
+        })
+        broken = installer.evaluate_pip_check({
             "returncode": 1,
             "stdout": "viser 1.0.0 requires yourdfpy, which is not installed.\n",
             "stderr": "",
         })
-        rejected = installer.evaluate_pip_check({
-            "returncode": 1,
-            "stdout": "nerfacc 0.5.2 requires rich, which is not installed.\n",
-            "stderr": "",
-        })
-        self.assertTrue(allowed["passed"])
-        self.assertFalse(rejected["passed"])
+        self.assertTrue(clean["passed"])
+        self.assertFalse(broken["passed"])
+
+    def test_viser_math_member_selection_is_viewer_free(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            wheel = Path(td) / "viser.whl"
+            with zipfile.ZipFile(wheel, "w") as archive:
+                for name in (
+                    "viser/transforms/__init__.py",
+                    "viser/transforms/_base.py",
+                    "viser/transforms/_se2.py",
+                    "viser/transforms/_se3.py",
+                    "viser/transforms/_so2.py",
+                    "viser/transforms/_so3.py",
+                ):
+                    archive.writestr(name, "# test\n")
+                archive.writestr("viser/_viser.py", "raise RuntimeError('viewer')\n")
+                archive.writestr("viser-1.0.0.dist-info/licenses/LICENSE", "MIT\n")
+            selection = installer.viser_math_member_names(wheel)
+            self.assertTrue(selection["passed"])
+            self.assertNotIn("viser/_viser.py", selection["members"])
+            self.assertIn("viser/transforms/_so3.py", selection["members"])
+
+    def test_viser_math_runtime_deploys_from_locked_wheel(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            wheel = root / "viser.whl"
+            with zipfile.ZipFile(wheel, "w") as archive:
+                for name in (
+                    "viser/transforms/__init__.py",
+                    "viser/transforms/_base.py",
+                    "viser/transforms/_se2.py",
+                    "viser/transforms/_se3.py",
+                    "viser/transforms/_so2.py",
+                    "viser/transforms/_so3.py",
+                ):
+                    archive.writestr(name, "# test\n")
+                archive.writestr("viser/_viser.py", "raise RuntimeError('viewer')\n")
+                archive.writestr("viser-1.0.0.dist-info/licenses/LICENSE", "MIT\n")
+            report = {
+                "paths": {
+                    "viser_math_runtime": str(root / "runtime" / "viser-math-only-v1"),
+                }
+            }
+            original_hash = installer.VISER_WHEEL_SHA256
+            try:
+                installer.VISER_WHEEL_SHA256 = installer.sha256_file(wheel)
+                result = installer.deploy_viser_math_runtime(report, wheel)
+            finally:
+                installer.VISER_WHEEL_SHA256 = original_hash
+            self.assertTrue(result["passed"])
+            runtime = Path(result["runtime"])
+            self.assertTrue((runtime / installer.VISER_MATH_MARKER).is_file())
+            self.assertTrue((runtime / "viser" / "transforms" / "_so3.py").is_file())
+            self.assertFalse((runtime / "viser" / "_viser.py").exists())
 
     def test_nerfstudio_source_is_locked(self) -> None:
         self.assertEqual(
@@ -237,6 +292,8 @@ class PublicInstallerV15Tests(unittest.TestCase):
             "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb",
             installer.VISER_WHEEL_SHA256,
         )
+        self.assertEqual("amd-nerfstudio-viser-math-only-v1", installer.VISER_MATH_MARKER_SCHEMA)
+        self.assertEqual("viser/transforms/", installer.VISER_MATH_PREFIX)
 
 
     def test_build_report_exposes_requested_arch(self) -> None:
