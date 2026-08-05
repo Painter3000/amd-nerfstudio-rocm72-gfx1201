@@ -101,6 +101,72 @@ class PublicInstallerV15Tests(unittest.TestCase):
             self.assertFalse(result["modified"])
             self.assertEqual("EXPLICIT_ENV_BUILD_BASE_INCOMPLETE", result["reason"])
 
+    def test_torch_requirements_are_pinned(self) -> None:
+        self.assertEqual(
+            [f"{name}=={version}" for name, version in installer.TORCH_PINS.items()],
+            installer.torch_requirements(),
+        )
+        self.assertEqual("7.2.53211", installer.EXPECTED_TORCH_HIP)
+
+    def test_tiny_source_is_locked_to_qualified_public_commit(self) -> None:
+        self.assertEqual(
+            "phase4a2-model-b-public-gfx1201-pass",
+            installer.TINY_TAG,
+        )
+        self.assertEqual(
+            "b98bdcc6b2878f6cb6c10a2141e50867cec6d96a",
+            installer.TINY_COMMIT,
+        )
+
+    def test_external_env_torch_install_is_verify_only(self) -> None:
+        report = {
+            "passed": True,
+            "environment_selection": {
+                "ownership": "EXTERNAL_EXPLICIT",
+                "path": "/tmp/external-env",
+            },
+        }
+        result = installer.install_torch_stack(report)
+        self.assertFalse(result["passed"])
+        self.assertFalse(result["modified"])
+        self.assertEqual("EXPLICIT_EXTERNAL_ENV_IS_VERIFY_ONLY", result["reason"])
+
+    def test_tiny_build_requires_passing_preflight(self) -> None:
+        result = installer.build_tiny_runtime({"passed": False})
+        self.assertFalse(result["passed"])
+        self.assertEqual("PREFLIGHT_NOT_PASSED", result["reason"])
+
+    def test_clean_submodule_status_keeps_leading_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            source = Path(td)
+            (source / ".git").mkdir()
+            for path in (
+                source / "bindings" / "torch" / "setup.py",
+                source / "src" / "rocwmma_width64_mlp.cu",
+                source / "scripts" / "phase4a_hipcc_compat.sh",
+            ):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("x\n", encoding="utf-8")
+            (source / "scripts" / "phase4a_hipcc_compat.sh").chmod(0o755)
+            for dep in ("cutlass", "fmt", "cmrc"):
+                (source / "dependencies" / dep / ".git").mkdir(parents=True)
+
+            values = {
+                ("rev-parse", "HEAD"): installer.TINY_COMMIT,
+                ("rev-parse", "HEAD^{tree}"): "tree-sha",
+                ("status", "--porcelain=v1", "--untracked-files=all"): "",
+                ("rev-list", "-n", "1", installer.TINY_TAG): installer.TINY_COMMIT,
+                ("submodule", "status", "--recursive"): " abc dependencies/cutlass\n def dependencies/fmt",
+            }
+            original = installer.git_output
+            try:
+                installer.git_output = lambda repo, *args: values[args]
+                result = installer.verify_tiny_source(source)
+            finally:
+                installer.git_output = original
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["checks"]["submodules_clean"])
+
     def test_self_test(self) -> None:
         self.assertEqual(0, installer.self_test())
 
