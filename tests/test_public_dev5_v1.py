@@ -76,6 +76,21 @@ class PublicDev5Tests(unittest.TestCase):
             self.dev5.EXPECTED_NERFACC_NATIVE_SHA,
         )
 
+    def test_nerfacc_probe_uses_qualified_load_order_and_library_path(self):
+        source = DEV5.read_text(encoding="utf-8")
+        probe_start = source.index("def probe_nerfacc")
+        probe_end = source.index("\ndef create_gate", probe_start)
+        probe = source[probe_start:probe_end]
+
+        self.assertLess(
+            probe.index("import torch"),
+            probe.index("import nerfacc.csrc"),
+        )
+        self.assertIn('env["LD_LIBRARY_PATH"]', probe)
+        self.assertIn("/opt/rocm/lib", probe)
+        self.assertIn("DEV5_NERFACC_JSON=", probe)
+        self.assertIn('"load_order": "torch_then_nerfacc_csrc"', probe)
+
     def test_tools_self_tests(self):
         for script in (DEPLOY, DEV5):
             proc = subprocess.run(

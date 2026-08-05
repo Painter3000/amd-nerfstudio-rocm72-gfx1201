@@ -134,27 +134,112 @@ def find_exact_one(root: Path, pattern: str) -> Path | None:
 
 
 def probe_nerfacc(python: Path, nerfstudio: Path, tcnn_runtime: Path) -> dict[str, Any]:
-    code = r'''
-import hashlib, json, pathlib
-import nerfacc.csrc
-path = pathlib.Path(nerfacc.csrc.__file__).resolve()
-print(json.dumps({"path": str(path), "sha256": hashlib.sha256(path.read_bytes()).hexdigest()}))
-'''
+    """Attest nerfacc after loading the owning torch/ROCm runtime first."""
+
+    code = r"""
+import hashlib
+import json
+import pathlib
+import traceback
+
+out = {"no_error": False}
+
+try:
+    import torch
+    import nerfacc.csrc as nerfacc_csrc
+
+    path = pathlib.Path(nerfacc_csrc.__file__).resolve()
+    out.update(
+        {
+            "no_error": True,
+            "torch": torch.__version__,
+            "hip": torch.version.hip,
+            "cuda_available": bool(torch.cuda.is_available()),
+            "gcn_arch": (
+                getattr(
+                    torch.cuda.get_device_properties(0),
+                    "gcnArchName",
+                    None,
+                )
+                if torch.cuda.is_available()
+                else None
+            ),
+            "path": str(path),
+            "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+        }
+    )
+except Exception as exc:
+    out["error"] = repr(exc)
+    out["traceback"] = traceback.format_exc()
+
+print("DEV5_NERFACC_JSON=" + json.dumps(out, sort_keys=True))
+"""
+
     env = os.environ.copy()
     env["PYTHONNOUSERSITE"] = "1"
     env["PYTHONDONTWRITEBYTECODE"] = "1"
-    env["PYTHONPATH"] = os.pathsep.join([str(tcnn_runtime), str(nerfstudio)])
-    result = run_command([str(python), "-c", code], cwd=Path("/tmp"), env=env, timeout=120)
-    payload: dict[str, Any] = {}
-    if result.get("returncode") == 0:
-        try:
-            payload = json.loads(result.get("stdout", "").strip().splitlines()[-1])
-        except Exception as exc:
-            payload = {"error": repr(exc)}
-    payload["process"] = result
-    payload["passed"] = payload.get("sha256") == EXPECTED_NERFACC_NATIVE_SHA
-    return payload
 
+    previous_pythonpath = env.get("PYTHONPATH", "")
+    pythonpath_parts = [str(tcnn_runtime), str(nerfstudio)]
+    if previous_pythonpath:
+        pythonpath_parts.append(previous_pythonpath)
+    env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)
+
+    pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    torch_lib = python.parent.parent / f"lib/{pyver}/site-packages/torch/lib"
+    previous_ld = env.get("LD_LIBRARY_PATH", "")
+    ld_parts = [
+        str(torch_lib),
+        "/opt/rocm/lib",
+        "/opt/rocm/lib64",
+    ]
+    if previous_ld:
+        ld_parts.append(previous_ld)
+    env["LD_LIBRARY_PATH"] = os.pathsep.join(ld_parts)
+
+    result = run_command(
+        [str(python), "-c", code],
+        cwd=Path("/tmp"),
+        env=env,
+        timeout=120,
+    )
+
+    payload: dict[str, Any] = {}
+    for line in reversed(result.get("stdout", "").splitlines()):
+        if line.startswith("DEV5_NERFACC_JSON="):
+            try:
+                payload = json.loads(line.split("=", 1)[1])
+            except Exception as exc:
+                payload = {"error": repr(exc)}
+            break
+
+    if not payload:
+        payload = {
+            "error": "DEV5_NERFACC_JSON_MISSING",
+            "stdout": result.get("stdout", ""),
+            "stderr": result.get("stderr", ""),
+        }
+
+    payload["process"] = result
+    payload["environment"] = {
+        "PYTHONPATH": env["PYTHONPATH"],
+        "LD_LIBRARY_PATH": env["LD_LIBRARY_PATH"],
+        "torch_lib": str(torch_lib),
+        "torch_lib_exists": torch_lib.is_dir(),
+        "load_order": "torch_then_nerfacc_csrc",
+    }
+    payload["checks"] = {
+        "process": result.get("returncode") == 0,
+        "no_error": payload.get("no_error") is True,
+        "torch": payload.get("torch") == "2.13.0+rocm7.2",
+        "hip": payload.get("hip") == "7.2.53211",
+        "cuda_available": payload.get("cuda_available") is True,
+        "gcn_arch": payload.get("gcn_arch") == "gfx1201",
+        "native_hash": payload.get("sha256") == EXPECTED_NERFACC_NATIVE_SHA,
+        "torch_lib": torch_lib.is_dir(),
+    }
+    payload["passed"] = all(payload["checks"].values())
+    return payload
 
 def create_gate(report: dict[str, Any]) -> str:
     checks = report.get("checks", {})

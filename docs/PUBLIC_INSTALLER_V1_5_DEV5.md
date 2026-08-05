@@ -130,3 +130,22 @@ A dev5 PASS does not establish:
 - sustained P2 stability;
 - reconstruction-quality performance;
 - superiority over CUDA or NVIDIA hardware.
+
+## dev5a nerfacc loader correction
+
+The original dev5 identity child loaded ``nerfacc.csrc`` before PyTorch and
+without explicitly exposing the PyTorch and ROCm shared-library directories.
+That differed from the already-qualified dev4e load contract and could reject
+the correct native before P0 was allowed to start.
+
+Dev5a preserves all 28 gates and all existing hashes. It changes only the
+nerfacc identity probe:
+
+- import ``torch`` before ``nerfacc.csrc``;
+- prepend ``torch/lib``, ``/opt/rocm/lib`` and ``/opt/rocm/lib64``;
+- preserve existing ``PYTHONPATH`` and ``LD_LIBRARY_PATH`` values;
+- emit the exact import error, runtime versions, architecture and native hash;
+- require every probe check before P0 may proceed.
+
+The failed dev5 evidence archive remains immutable historical evidence. A
+dev5a execution creates a new run ID and evidence archive.
