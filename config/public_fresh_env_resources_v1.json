@@ -1,55 +1,22 @@
 {
-  "schema": "amd-nerfstudio-public-fresh-env-resources-v1",
-  "profile": "reference-binary-fresh-env",
-  "scope": "NERFACTO_TRAINING_CHAIN_VIEWER_RUNTIME_DISABLED",
-  "target": {
-    "architecture": "gfx1201",
-    "hip": "7.2.53211",
-    "operating_system": "Ubuntu 24.04",
-    "python_major_minor": "3.12",
-    "torch": "2.13.0+rocm7.2",
-    "torchvision": "0.28.0+rocm7.2",
-    "viser_math": "1.0.0"
-  },
-  "network_policy": {
-    "default": "PROMPT_BEFORE_NETWORK",
-    "auto": "PINNED_RESOURCES_ONLY",
-    "offline": "NETWORK_FORBIDDEN",
-    "first_fetch_integrity": "PINNED_INDEX_AND_VERSION_THEN_LOCAL_SHA256_LOCK"
-  },
-  "public_python_index": {
-    "primary": "https://pypi.org/simple",
-    "pytorch_rocm": "https://download.pytorch.org/whl/rocm7.2"
-  },
-  "nerfstudio_source": {
-    "url": "https://github.com/nerfstudio-project/nerfstudio.git",
-    "commit": "50e0e3c70c775e89333256213363badbf074f29d",
-    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e",
-    "mlp_relative_path": "nerfstudio/field_components/mlp.py",
-    "mlp_sha256": "4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad"
+  "cache_layout": {
+    "nerfstudio_source": "sources/nerfstudio",
+    "wheelhouse": "wheelhouse/py312-rocm72",
+    "wheelhouse_lock": "locks/WHEELHOUSE_LOCK.json"
   },
   "custom_resources": {
     "nerfacc_wheel": {
+      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
       "cache_relative_path": "wheels/custom/nerfacc-0.5.2-cp312-cp312-linux_x86_64.whl",
-      "sha256": "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00",
+      "download_url": null,
       "installed_native_relative_path": "nerfacc/csrc.so",
       "installed_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
-      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
-      "download_url": null
-    },
-    "tiny_rdna4_runtime": {
-      "cache_relative_path": "runtime/tiny-rdna4-nn",
-      "modules_relative_path": "tinycudann/modules.py",
-      "modules_sha256": "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
-      "native_glob": "tinycudann_bindings/_120_C*.so",
-      "native_sha256": "883f89efdad7bb909a4a3899ab79b2defe9713fdb5c7cf22cf4882c626b3efc4",
-      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
-      "download_url": null
+      "sha256": "252ec63319461889319a3bc535c4076c3c84bfc1ff6ddb5d64e1bb8b18032e00"
     },
     "quick_validation_dataset": {
+      "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
       "cache_relative_path": "datasets/quick-validation",
-      "transforms_sha256": "af9521e1e841c5e4b5665836a525e01758740be138fcf2fa7fbdb6e6bf2c4f81",
-      "path_size_manifest_sha256": "556323e293c813841ad09d1b8accd9523201784e134a1be52628f4fc70e7bfbe",
+      "download_url": null,
       "images": {
         "000.png": "e46d81d50f465fc315e0a5941fcef213eabc65f9b5801f0e25295b77aa7101ba",
         "001.png": "16b5deb940f566d23cb6b056c51bf416a927322fadae65b714e32047ef685a2c",
@@ -58,14 +25,34 @@
         "004.png": "9685e77a01ab1532b53c2dddc640270c57514a984a49cd38f81ad4ac3b84434c",
         "005.png": "32f82b9b4ea2de3ed82b4e1358661deb5d7d0dac177f9a9aac51e359c19286b4"
       },
+      "path_size_manifest_sha256": "556323e293c813841ad09d1b8accd9523201784e134a1be52628f4fc70e7bfbe",
+      "transforms_sha256": "af9521e1e841c5e4b5665836a525e01758740be138fcf2fa7fbdb6e6bf2c4f81"
+    },
+    "tiny_rdna4_runtime": {
       "availability": "CACHE_OR_EXPLICIT_LOCAL_PATH",
-      "download_url": null
+      "cache_relative_path": "runtime/tiny-rdna4-nn",
+      "download_url": null,
+      "modules_relative_path": "tinycudann/modules.py",
+      "modules_sha256": "6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a",
+      "native_glob": "tinycudann_bindings/_120_C*.so",
+      "native_sha256": "4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917",
+      "source_commit": "b98bdcc6b2878f6cb6c10a2141e50867cec6d96a",
+      "source_tree": "a8ffaaa3f509400c40f6de58e8a74fb047f8e16e",
+      "source_url": "https://github.com/Painter3000/tiny-rdna4-nn.git"
     }
   },
-  "cache_layout": {
-    "wheelhouse": "wheelhouse/py312-rocm72",
-    "wheelhouse_lock": "locks/WHEELHOUSE_LOCK.json",
-    "nerfstudio_source": "sources/nerfstudio"
+  "nerfstudio_source": {
+    "commit": "50e0e3c70c775e89333256213363badbf074f29d",
+    "mlp_relative_path": "nerfstudio/field_components/mlp.py",
+    "mlp_sha256": "4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad",
+    "tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e",
+    "url": "https://github.com/nerfstudio-project/nerfstudio.git"
+  },
+  "network_policy": {
+    "auto": "PINNED_RESOURCES_ONLY",
+    "default": "PROMPT_BEFORE_NETWORK",
+    "first_fetch_integrity": "PINNED_INDEX_AND_VERSION_THEN_LOCAL_SHA256_LOCK",
+    "offline": "NETWORK_FORBIDDEN"
   },
   "nonclaims": [
     "FRESH_NATIVE_NERFACC_BUILD",
@@ -75,15 +62,31 @@
     "CROSS_TIME_PYPI_RESOLUTION_IDENTITY_BEFORE_A_PUBLISHED_WHEELHOUSE_LOCK",
     "VMM_FALLBACK_PERFORMANCE_PARITY"
   ],
+  "profile": "reference-binary-fresh-env",
   "public_math_dependencies": {
     "viser_transforms": {
-      "distribution": "viser",
-      "version": "1.0.0",
-      "wheel_filename": "viser-1.0.0-py3-none-any.whl",
-      "wheel_sha256": "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb",
-      "install_mode": "NO_DEPS_MATH_ONLY",
       "allowed_surface": "viser.transforms",
-      "viewer_construction": "FAIL_CLOSED"
+      "distribution": "viser",
+      "install_mode": "NO_DEPS_MATH_ONLY",
+      "version": "1.0.0",
+      "viewer_construction": "FAIL_CLOSED",
+      "wheel_filename": "viser-1.0.0-py3-none-any.whl",
+      "wheel_sha256": "3be881a60f0295efd8a93df97646bbc04d070ccf8d16d8faf284eb3b70eda6eb"
     }
+  },
+  "public_python_index": {
+    "primary": "https://pypi.org/simple",
+    "pytorch_rocm": "https://download.pytorch.org/whl/rocm7.2"
+  },
+  "schema": "amd-nerfstudio-public-fresh-env-resources-v1",
+  "scope": "NERFACTO_TRAINING_CHAIN_VIEWER_RUNTIME_DISABLED",
+  "target": {
+    "architecture": "gfx1201",
+    "hip": "7.2.53211",
+    "operating_system": "Ubuntu 24.04",
+    "python_major_minor": "3.12",
+    "torch": "2.13.0+rocm7.2",
+    "torchvision": "0.28.0+rocm7.2",
+    "viser_math": "1.0.0"
   }
 }

@@ -1,0 +1,73 @@
+{
+  "classification": "PUBLIC_DEV5_DATASET_DEPLOYMENT_PLUS_REAL_NERFACTO_P0_P1",
+  "decision": "DEV5_P0_P1_QUALIFIED",
+  "evidence": {
+    "archive_relative_path": "evidence/dev5f/public_dev5_p0_p1_archives/20260805T092040Z_43673.tar.gz",
+    "archive_sha256": "9f104f5fac3b434852e0f31483cd2b421964654641b8454666c8f6911c53556c",
+    "blockers": [],
+    "declared_gate_count": 28,
+    "failed_gate_count": 0,
+    "observed_gate_count": 28,
+    "passed_gate_count": 28,
+    "replacement_runs": [],
+    "run_id": "20260805T092040Z_43673"
+  },
+  "mechanics": {
+    "backward_finite_nonzero_gradients": true,
+    "checkpoint_retention_policy": true,
+    "checkpoint_write_and_hash": true,
+    "finite_loss": 0.09959939122200012,
+    "fresh_process_exact_reload": true,
+    "fresh_process_resume_step": true,
+    "optimizer_parameter_update": true,
+    "real_dataloader_batch": true,
+    "single_tiny_rdna4_runtime_origin": true,
+    "spawn_worker_hook_attested": true,
+    "train_rays_per_batch": 1024,
+    "vram_vmm_no_oom": true
+  },
+  "modifications": {
+    "nerfacc_native_modified": false,
+    "nerfstudio_source_modified": false,
+    "pillow_distribution_modified": false,
+    "tiny_rdna4_native_modified": false
+  },
+  "p2": {
+    "automatic_transition": false,
+    "executed": false,
+    "policy": "MAINTAINER_ONLY"
+  },
+  "patch_level": "F",
+  "qualified": true,
+  "remote_push": "NOT_RUN",
+  "repository": {
+    "branch": "feature/installer-v1.5.0",
+    "implementation_commit": "d73e72615bba404dc8e6b105674890f4abcb6311",
+    "implementation_tree": "787e8e296e55cccc2b0df21106ecb951a9d9f343"
+  },
+  "runtime_sha256": {
+    "dataset_archive": "0a968da041884f1f815bc9176aef1a13dc72beb7531e25c5c98cf24db1db25ac",
+    "nerfacc_native": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
+    "tinycudann_modules": "6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a",
+    "tinycudann_native": "4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917"
+  },
+  "schema": "amd-nerfstudio-public-installer-v1-5-dev5f-final-qualification-v1",
+  "sources": {
+    "nerfstudio_commit": "50e0e3c70c775e89333256213363badbf074f29d",
+    "nerfstudio_tree": "9d5ff468eeff89b66995e9984acaa378c37dc07e",
+    "tiny_rdna4_nn_commit": "b98bdcc6b2878f6cb6c10a2141e50867cec6d96a",
+    "tiny_rdna4_nn_tree": "a8ffaaa3f509400c40f6de58e8a74fb047f8e16e"
+  },
+  "tag": {
+    "annotated": true,
+    "name": "public-installer-v1.5.0-p0-p1-gfx1201-pass",
+    "target": "freeze_commit_created_by_script"
+  },
+  "target": {
+    "gcn_arch": "gfx1201",
+    "hip": "7.2.53211",
+    "pillow": "12.2.0",
+    "python": "3.12.3",
+    "torch": "2.13.0+rocm7.2"
+  }
+}

@@ -6,3 +6,9 @@ torchmetrics==1.9.0
 lightning-utilities==0.15.3
 opencv-python-headless==4.10.0.84
 splines==0.3.0
+rich==14.3.4
+markdown-it-py==4.2.0
+mdurl==0.1.2
+Pygments==2.20.0
+PyYAML==6.0.3
+rawpy==0.27.0

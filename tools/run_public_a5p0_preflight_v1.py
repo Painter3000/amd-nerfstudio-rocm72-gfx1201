@@ -79,8 +79,11 @@ try:
     import nerfacc.csrc as nerfacc_csrc
     import tinycudann.modules as tcnn_modules
     from tinycudann.modules import _C
-    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_viewer_free_import_quarantine
+    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_pillow_encoder_extents_compatibility, install_rdna4_portable_mlp_policy, install_spawn_worker_compatibility, install_viewer_free_import_quarantine
     viewer_policy = install_viewer_free_import_quarantine()
+    portable_mlp_policy = install_rdna4_portable_mlp_policy()
+    pillow_image_compatibility = install_pillow_encoder_extents_compatibility()
+    spawn_worker_compatibility = install_spawn_worker_compatibility()
     for name in modules:
         try:
             mod = importlib.import_module(name)
@@ -106,6 +109,9 @@ try:
         "nerfacto_config_type": type(cfg).__name__,
         "config_vis": cfg.vis,
         "viewer_import_policy": viewer_policy,
+        "portable_mlp_policy": portable_mlp_policy,
+        "pillow_image_compatibility": pillow_image_compatibility,
+        "spawn_worker_compatibility": spawn_worker_compatibility,
         "datamanager_config_type": type(dm).__name__,
         "has_dataloader_num_workers": hasattr(dm, "dataloader_num_workers"),
         "has_prefetch_factor": hasattr(dm, "prefetch_factor"),
@@ -114,6 +120,14 @@ try:
         out["cuda_available"]
         and cfg.vis == "tensorboard"
         and viewer_policy.get("viewer_construction") == "FAIL_CLOSED"
+        and portable_mlp_policy.get("effective_otype") == "PortableMLP"
+        and portable_mlp_policy.get("fail_closed_unknown_otype") is True
+        and pillow_image_compatibility.get("smoke_test_passed") is True
+        and pillow_image_compatibility.get("nerfstudio_source_modified") is False
+        and pillow_image_compatibility.get("pillow_distribution_modified") is False
+        and spawn_worker_compatibility.get("parallel_datamanager_alias_patched") is True
+        and spawn_worker_compatibility.get("spawn_safe_top_level") is True
+        and spawn_worker_compatibility.get("worker_init_fn") == "public_nerfacto_config_v1.public_spawn_worker_init"
         and all(row["passed"] for row in out["modules"])
     )
 except Exception as exc:
@@ -220,6 +234,9 @@ def main() -> int:
         "gcn_arch_matches": payload.get("gcn_arch") == target["gcn_arch"],
         "selected_imports_pass": payload.get("passed") is True,
         "dataloader_config_fields_present": payload.get("has_dataloader_num_workers") is True and payload.get("has_prefetch_factor") is True,
+        "portable_mlp_policy": payload.get("portable_mlp_policy", {}).get("effective_otype") == "PortableMLP" and payload.get("portable_mlp_policy", {}).get("fail_closed_unknown_otype") is True,
+        "pillow_image_compatibility": payload.get("pillow_image_compatibility", {}).get("smoke_test_passed") is True and payload.get("pillow_image_compatibility", {}).get("nerfstudio_source_modified") is False and payload.get("pillow_image_compatibility", {}).get("pillow_distribution_modified") is False,
+        "spawn_worker_compatibility": payload.get("spawn_worker_compatibility", {}).get("parallel_datamanager_alias_patched") is True and payload.get("spawn_worker_compatibility", {}).get("spawn_safe_top_level") is True and payload.get("spawn_worker_compatibility", {}).get("worker_init_fn") == "public_nerfacto_config_v1.public_spawn_worker_init",
         "tinycudann_modules": file_anchor(modules_path, runtime_ref["tinycudann_modules_sha256"]) if modules_path else {"exists": False, "hash_matches": False},
         "tinycudann_native": file_anchor(native_path, runtime_ref["tinycudann_native_sha256"]) if native_path else {"exists": False, "hash_matches": False},
         "nerfacc_native": file_anchor(nerfacc_path, runtime_ref["nerfacc_native_sha256"]) if nerfacc_path else {"exists": False, "hash_matches": False},
@@ -229,6 +246,9 @@ def main() -> int:
     runtime_anchors["passed"] = bool(
         runtime_anchors["torch_matches"] and runtime_anchors["hip_matches"] and runtime_anchors["gcn_arch_matches"]
         and runtime_anchors["selected_imports_pass"] and runtime_anchors["dataloader_config_fields_present"]
+        and runtime_anchors["portable_mlp_policy"]
+        and runtime_anchors["pillow_image_compatibility"]
+        and runtime_anchors["spawn_worker_compatibility"]
         and runtime_anchors["tinycudann_modules"].get("hash_matches") and runtime_anchors["tinycudann_native"].get("hash_matches")
         and runtime_anchors["nerfacc_native"].get("hash_matches") and runtime_anchors["single_runtime_origin"]
     )
