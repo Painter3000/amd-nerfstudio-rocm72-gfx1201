@@ -208,3 +208,19 @@ It preserves Nerfstudio's raw-encoder path and supplies `(0, 0, width, height)`
 to `setimage`. Both imported Nerfstudio aliases are patched together and a
 real writable 2x2 RGB conversion must pass before P0 can emit its policy and
 before P1 can call `trainer.setup()`.
+
+## dev5f spawned DataLoader worker compatibility
+
+The dev5e process-local Pillow compatibility passed its direct smoke test, but
+Nerfstudio's `ParallelDataManager` deliberately uses Python multiprocessing
+with the `spawn` start method. The training worker therefore starts a fresh
+interpreter and does not inherit monkeypatches installed in the producer.
+
+Dev5f keeps the qualified single-worker topology and installs a picklable,
+top-level `worker_init_fn` through the `ParallelDataManager` module's local
+`DataLoader` alias. The hook installs and verifies the Pillow encoder-extents
+compatibility inside the spawned worker before its first dataset access.
+Unknown pre-existing worker hooks are rejected. The P1 child environment also
+places the repository `tools` directory explicitly on `PYTHONPATH`, so the
+worker can import the hook by its stable module-qualified name. Nerfstudio,
+Pillow, tiny-rdna4-nn, nerfacc, Torch, and ROCm installations remain unchanged.

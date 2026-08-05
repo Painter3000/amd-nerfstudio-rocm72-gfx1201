@@ -108,6 +108,28 @@ class PublicDev5Tests(unittest.TestCase):
 
 
 
+
+    def test_spawn_worker_compatibility_is_top_level_fail_closed_and_attested(self):
+        config = NERFACTO_CONFIG.read_text(encoding="utf-8")
+        p0 = P0_RUNNER.read_text(encoding="utf-8")
+        p1 = P1_RUNNER.read_text(encoding="utf-8")
+
+        self.assertIn(
+            'SPAWN_WORKER_COMPAT_MARKER = "amd_nerfstudio_public_spawn_worker_compat_v1"',
+            config,
+        )
+        self.assertIn("def public_spawn_worker_init(worker_id: int)", config)
+        self.assertIn("parallel_datamanager.DataLoader = public_parallel_data_loader", config)
+        self.assertIn('kwargs["worker_init_fn"] = public_spawn_worker_init', config)
+        self.assertIn('"spawn_safe_top_level": "<locals>" not in worker_qualname', config)
+        self.assertIn('"fail_closed_existing_worker_hook": True', config)
+        self.assertIn('"spawn_worker_compatibility": spawn_worker_compatibility', p0)
+        self.assertIn('runtime_anchors["spawn_worker_compatibility"]', p0)
+        self.assertIn('"spawn_worker_compatibility": spawn_worker_compatibility', p1)
+        self.assertIn('"spawn_worker_hook_attested"', p1)
+        self.assertIn('str(Path(__file__).resolve().parent)', p1)
+        self.assertIn("actual ParallelDataManager DataLoader lacks qualified spawn worker hook", p1)
+
     def test_pillow_encoder_extents_compatibility_is_scoped_and_attested(self):
         config = NERFACTO_CONFIG.read_text(encoding="utf-8")
         p0 = P0_RUNNER.read_text(encoding="utf-8")

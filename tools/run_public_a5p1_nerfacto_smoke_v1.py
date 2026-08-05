@@ -467,7 +467,7 @@ def loaded_tcnn_origins() -> dict[str, str]:
 
 
 def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, rays: int, checkpoint: Path | None = None) -> tuple[Any, dict[str, Any]]:
-    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_pillow_encoder_extents_compatibility, install_rdna4_portable_mlp_policy
+    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_pillow_encoder_extents_compatibility, install_rdna4_portable_mlp_policy, install_spawn_worker_compatibility
     cfg = copy.deepcopy(build_public_nerfacto_config())
     portable_mlp_policy = install_rdna4_portable_mlp_policy()
     if portable_mlp_policy.get("effective_otype") != "PortableMLP":
@@ -481,6 +481,13 @@ def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, ra
         raise RuntimeError("public Pillow compatibility modified Nerfstudio source")
     if pillow_image_compatibility.get("pillow_distribution_modified") is not False:
         raise RuntimeError("public Pillow compatibility modified Pillow distribution")
+    spawn_worker_compatibility = install_spawn_worker_compatibility()
+    if spawn_worker_compatibility.get("parallel_datamanager_alias_patched") is not True:
+        raise RuntimeError("public spawn worker DataLoader alias was not patched")
+    if spawn_worker_compatibility.get("spawn_safe_top_level") is not True:
+        raise RuntimeError("public spawn worker hook is not top-level")
+    if spawn_worker_compatibility.get("worker_init_fn") != "public_nerfacto_config_v1.public_spawn_worker_init":
+        raise RuntimeError("public spawn worker hook identity is invalid")
     cfg.data = data
     cfg.output_dir = output_dir
     cfg.experiment_name = run_name
@@ -538,6 +545,7 @@ def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, ra
         "model_implementation": getattr(cfg.pipeline.model, "implementation", None),
         "portable_mlp_policy": portable_mlp_policy,
         "pillow_image_compatibility": pillow_image_compatibility,
+        "spawn_worker_compatibility": spawn_worker_compatibility,
         "load_checkpoint": str(checkpoint) if checkpoint else None,
     }
     return cfg, summary
@@ -695,11 +703,23 @@ def child_execute(mode: str, root: Path, data: Path, run_dir: Path, seed: int, r
         if train_dataset is None or len(train_dataset) <= 0:
             raise RuntimeError("real train dataset is absent or empty")
         train_loader = getattr(dm, "train_ray_dataloader", None)
+        from public_nerfacto_config_v1 import public_spawn_worker_init
+        worker_init_fn = getattr(train_loader, "worker_init_fn", None)
+        worker_init_name = (
+            f"{getattr(worker_init_fn, '__module__', None)}."
+            f"{getattr(worker_init_fn, '__qualname__', None)}"
+            if worker_init_fn is not None
+            else None
+        )
         report["dataset_runtime"]["dataloader_num_workers"] = getattr(train_loader, "num_workers", None)
         report["dataset_runtime"]["prefetch_factor"] = getattr(train_loader, "prefetch_factor", None)
+        report["dataset_runtime"]["worker_init_fn"] = worker_init_name
+        report["dataset_runtime"]["spawn_worker_hook_attested"] = bool(worker_init_fn is public_spawn_worker_init)
         report["dataset_runtime"]["single_worker_topology"] = bool(getattr(train_loader, "num_workers", None) == 1)
         if not report["dataset_runtime"]["single_worker_topology"]:
             raise RuntimeError(f"runtime DataLoader worker count is not 1: {getattr(train_loader, 'num_workers', None)}")
+        if not report["dataset_runtime"]["spawn_worker_hook_attested"]:
+            raise RuntimeError("actual ParallelDataManager DataLoader lacks qualified spawn worker hook")
 
 
         captured: dict[str, Any] = {}
@@ -998,7 +1018,7 @@ def orchestrate(args: argparse.Namespace) -> int:
     child_env["NERFSTUDIO_RDNA4_A5_TCNN_RUNTIME"] = str(runtime)
     child_env["NERFSTUDIO_RDNA4_A5_NERFSTUDIO_WORKTREE"] = str(nerfstudio)
     child_env["TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD"] = "1"
-    child_env["PYTHONPATH"] = os.pathsep.join([str(runtime), str(nerfstudio)])
+    child_env["PYTHONPATH"] = os.pathsep.join([str(Path(__file__).resolve().parent), str(runtime), str(nerfstudio)])
     current_ld = child_env.get("LD_LIBRARY_PATH", "")
     child_env["LD_LIBRARY_PATH"] = os.pathsep.join([str(torch_lib), "/opt/rocm/lib", "/opt/rocm/lib64"] + ([current_ld] if current_ld else []))
 
