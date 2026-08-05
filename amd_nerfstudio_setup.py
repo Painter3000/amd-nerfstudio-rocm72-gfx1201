@@ -15,7 +15,7 @@ import zipfile
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev4c"
+VERSION = "1.5.0-dev4d"
 SCHEMA = "amd-nerfstudio-public-installer-v1-5-nerfacc-nerfstudio"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
@@ -1967,7 +1967,7 @@ def write_runtime_pth(
 def probe_nerfstudio_runtime(report: dict[str, Any], source: Path, python: Path) -> dict[str, Any]:
     code = r'''
 from importlib import import_module, metadata
-import hashlib, json, pathlib, sys
+import hashlib, json, os, pathlib, sys
 modules = [
     "nerfstudio",
     "nerfstudio.engine.trainer",
@@ -1981,6 +1981,26 @@ modules = [
 ]
 payload = {"modules": [], "python": sys.executable}
 try:
+    tools_path = pathlib.Path(
+        os.environ["AMD_NERFSTUDIO_PROJECT_TOOLS"]
+    ).resolve()
+    quarantine_tool = tools_path / "public_nerfacto_config_v1.py"
+    if not quarantine_tool.is_file():
+        raise RuntimeError(
+            f"VIEWER_QUARANTINE_TOOL_MISSING: {quarantine_tool}"
+        )
+    sys.path.insert(0, str(tools_path))
+    from public_nerfacto_config_v1 import (
+        VIEWER_FREE_STUB_MARKER,
+        install_viewer_free_import_quarantine,
+    )
+
+    # Nerfstudio 1.1.5 imports viewer modules eagerly from Trainer even when
+    # the qualified public profile uses TensorBoard only. Install the same
+    # fail-closed quarantine used by the public P0/P1 tools before importing
+    # any module that can reach trainer.py.
+    viewer_policy = install_viewer_free_import_quarantine()
+
     import torch
     import nerfacc.csrc as nerfacc_csrc
     import tinycudann.modules as tcnn_modules
@@ -1999,8 +2019,15 @@ try:
         "tiny_module": str(pathlib.Path(tcnn_modules.__file__).resolve()),
         "tiny_native": str(pathlib.Path(tcnn_modules._C.__file__).resolve()),
         "tiny_native_sha256": hashlib.sha256(pathlib.Path(tcnn_modules._C.__file__).read_bytes()).hexdigest(),
-        "viser_version": getattr(viser, "__version__", None),
-        "viser_module": str(pathlib.Path(viser.__file__).resolve()),
+        "viewer_policy": viewer_policy,
+        "viser_stub": bool(
+            getattr(viser, VIEWER_FREE_STUB_MARKER, False)
+        ),
+        "viser_module": (
+            str(pathlib.Path(viser.__file__).resolve())
+            if getattr(viser, "__file__", None)
+            else None
+        ),
         "viser_transforms": str(pathlib.Path(viser_transforms.__file__).resolve()),
         "rich_version": metadata.version("rich"),
         "opencv_headless": metadata.version("opencv-python-headless"),
@@ -2019,6 +2046,9 @@ print(json.dumps(payload, sort_keys=True))
 '''
     env = dict(os.environ)
     env["PYTHONNOUSERSITE"] = "1"
+    env["AMD_NERFSTUDIO_PROJECT_TOOLS"] = str(
+        (Path(report["paths"]["project_repo"]) / "tools").resolve()
+    )
     process = run_command([str(python), "-c", code], timeout=900, env=env)
     payload: dict[str, Any] = {}
     if process.get("returncode") == 0:
@@ -2043,9 +2073,15 @@ print(json.dumps(payload, sort_keys=True))
         "gcn_arch": payload.get("gcn_arch") == report["arch"],
         "nerfacc_hash": payload.get("nerfacc_native_sha256") == NERFACC_NATIVE_SHA256,
         "tiny_origin": str(payload.get("tiny_module", "")).startswith(str(Path(report["paths"]["tiny_runtime"]).resolve())),
-        "viser": payload.get("viser_version") == VISER_VERSION,
+        "viewer_policy": (
+            payload.get("viewer_policy", {}).get("policy")
+            == "TENSORBOARD_ONLY_VIEWER_IMPORT_QUARANTINE"
+            and payload.get("viewer_policy", {}).get("viewer_construction")
+            == "FAIL_CLOSED"
+        ),
+        "viser_stub": payload.get("viser_stub") is True,
+        "viser_stub_has_no_runtime_file": payload.get("viser_module") is None,
         "viser_distribution_absent": payload.get("viser_distribution") is None,
-        "viser_origin": str(payload.get("viser_module", "")).startswith(str(Path(report["paths"]["viser_math_runtime"]).resolve())),
         "viser_transforms_origin": str(payload.get("viser_transforms", "")).startswith(str(Path(report["paths"]["viser_math_runtime"]).resolve())),
         "rich": payload.get("rich_version") == NERFACC_RICH_PINS["rich"],
         "opencv_headless": payload.get("opencv_headless") == "4.10.0.84",
@@ -2383,7 +2419,7 @@ def self_test() -> int:
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 22,
+        "tests": 23,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")
@@ -2572,6 +2608,25 @@ def main() -> int:
         print("Nerfstudio scoped runtime:")
         print(f"  status: {nerfstudio_result.get('status')}")
         print(f"  reason: {nerfstudio_result.get('reason')}")
+        if not nerfstudio_result.get("passed"):
+            runtime_probe = nerfstudio_result.get("runtime", {})
+            failed_checks = [
+                name
+                for name, value in runtime_probe.get("checks", {}).items()
+                if not value
+            ]
+            if failed_checks:
+                print("  failed runtime checks:")
+                for name in failed_checks:
+                    print(f"    - {name}")
+            runtime_payload = runtime_probe.get("payload", {})
+            if runtime_payload.get("error"):
+                print(f"  runtime error: {runtime_payload.get('error')}")
+            process = runtime_probe.get("process", {})
+            if process.get("stderr"):
+                print("  runtime stderr:")
+                for line in str(process.get("stderr")).splitlines()[-20:]:
+                    print(f"    {line}")
         print(f"NERFSTUDIO_INSTALL: {'PASS' if nerfstudio_result.get('passed') else 'FAIL'}")
 
     passed = report.get("passed") is True

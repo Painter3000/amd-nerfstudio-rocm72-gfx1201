@@ -1,6 +1,6 @@
 # Public installer v1.5
 
-> dev4c deploys a hash-attested, viewer-free `viser.transforms` runtime from
+> dev4d deploys a hash-attested, viewer-free `viser.transforms` runtime from
 > the locked Viser 1.0.0 wheel. The full Viser GUI/server distribution is not
 > retained in the managed environment.
 
@@ -120,8 +120,16 @@ file-hash marker, and places that managed runtime first on `sys.path`. This
 avoids importing Viser's GUI/server initializer and keeps `pip check` strict.
 Viewer construction remains fail-closed.
 
+The final scoped import qualification installs the existing
+`public_nerfacto_config_v1` viewer quarantine before importing
+`nerfstudio.engine.trainer` and the other P0/P1 modules. This is required
+because Nerfstudio 1.1.5 eagerly imports viewer modules from `trainer.py` even
+when the selected public profile uses TensorBoard only. The probe verifies the
+fail-closed policy, the synthetic `viser` stub, and the retained
+`viser.transforms` origin separately.
+
 When an earlier dev4 run left the full `viser==1.0.0` distribution in an
-installer-managed environment, dev4c removes exactly that distribution before
+installer-managed environment, dev4d removes exactly that distribution before
 the torch and nerfacc stages perform their strict global dependency checks.
 The build-base refresh of a reused managed environment verifies only its pinned
 build packages first; the global `pip check` is deferred until after the
@@ -131,7 +139,7 @@ dependency closure.
 The scoped runtime requires `opencv-python-headless==4.10.0.84` and rejects the
 GUI `opencv-python` distribution.
 
-## dev4c invocation
+## dev4d invocation
 
 For an installation where the earlier stages are already qualified:
 
@@ -162,6 +170,6 @@ python3.12 ./amd_nerfstudio_setup.py \
 
 ## Scope boundary
 
-Dev4c does not claim the full Nerfstudio dependency set, viewer-server support,
+Dev4d does not claim the full Nerfstudio dependency set, viewer-server support,
 Open3D, COLMAP, data-processing utilities, or P0/P1 execution. Dataset deployment
 and the actual P0/P1 gates are later v1.5 stages.

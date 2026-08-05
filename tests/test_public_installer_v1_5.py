@@ -369,6 +369,111 @@ class PublicInstallerV15Tests(unittest.TestCase):
             self.assertTrue((runtime / "viser" / "transforms" / "_so3.py").is_file())
             self.assertFalse((runtime / "viser" / "_viser.py").exists())
 
+    def test_runtime_probe_installs_viewer_quarantine_before_trainer_import(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            project_repo = root / "project"
+            source = root / "sources" / "nerfstudio"
+            tiny_runtime = root / "runtime" / "tiny-rdna4-nn"
+            viser_runtime = root / "runtime" / installer.VISER_MATH_RUNTIME_DIRNAME
+            tools = project_repo / "tools"
+            tools.mkdir(parents=True)
+            (tools / "public_nerfacto_config_v1.py").write_text(
+                "# fixture\n",
+                encoding="utf-8",
+            )
+
+            module_names = [
+                "nerfstudio",
+                "nerfstudio.engine.trainer",
+                "nerfstudio.pipelines.base_pipeline",
+                "nerfstudio.data.datamanagers.parallel_datamanager",
+                "nerfstudio.data.dataparsers.nerfstudio_dataparser",
+                "nerfstudio.models.nerfacto",
+                "nerfstudio.field_components.encodings",
+                "nerfstudio.field_components.mlp",
+                "viser.transforms",
+            ]
+            module_rows = []
+            for name in module_names:
+                if name == "viser.transforms":
+                    path = viser_runtime / "viser" / "transforms" / "__init__.py"
+                else:
+                    suffix = "__init__.py" if name == "nerfstudio" else name.split(".")[-1] + ".py"
+                    path = source / suffix
+                module_rows.append({"name": name, "file": str(path)})
+
+            payload = {
+                "modules": module_rows,
+                "python": str(root / "venv" / "bin" / "python"),
+                "torch": installer.TORCH_PINS["torch"],
+                "hip": installer.EXPECTED_TORCH_HIP,
+                "cuda_available": True,
+                "gcn_arch": installer.SUPPORTED_ARCH,
+                "nerfacc_native": str(root / "nerfacc" / "csrc.so"),
+                "nerfacc_native_sha256": installer.NERFACC_NATIVE_SHA256,
+                "tiny_module": str(tiny_runtime / "tinycudann" / "modules.py"),
+                "tiny_native": str(tiny_runtime / "tinycudann_bindings" / "_120_C.so"),
+                "tiny_native_sha256": "4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917",
+                "viewer_policy": {
+                    "policy": "TENSORBOARD_ONLY_VIEWER_IMPORT_QUARANTINE",
+                    "viewer_construction": "FAIL_CLOSED",
+                },
+                "viser_stub": True,
+                "viser_module": None,
+                "viser_transforms": str(
+                    viser_runtime / "viser" / "transforms" / "__init__.py"
+                ),
+                "viser_distribution": None,
+                "rich_version": installer.NERFACC_RICH_PINS["rich"],
+                "opencv_headless": "4.10.0.84",
+                "opencv_gui": None,
+            }
+
+            captured = {}
+            original_run = installer.run_command
+
+            def fake_run(argv, timeout=120, env=None):
+                captured["code"] = argv[2]
+                captured["env"] = dict(env or {})
+                return {
+                    "argv": list(argv),
+                    "returncode": 0,
+                    "stdout": installer.json.dumps(payload, sort_keys=True) + "\n",
+                    "stderr": "",
+                }
+
+            report = {
+                "arch": installer.SUPPORTED_ARCH,
+                "paths": {
+                    "project_repo": str(project_repo),
+                    "tiny_runtime": str(tiny_runtime),
+                    "viser_math_runtime": str(viser_runtime),
+                },
+            }
+
+            try:
+                installer.run_command = fake_run
+                result = installer.probe_nerfstudio_runtime(
+                    report,
+                    source,
+                    root / "venv" / "bin" / "python",
+                )
+            finally:
+                installer.run_command = original_run
+
+            self.assertTrue(result["passed"])
+            code = captured["code"]
+            self.assertLess(
+                code.index("viewer_policy = install_viewer_free_import_quarantine()"),
+                code.index("import viser\n"),
+            )
+            self.assertIn("VIEWER_FREE_STUB_MARKER", code)
+            self.assertEqual(
+                str(tools.resolve()),
+                captured["env"]["AMD_NERFSTUDIO_PROJECT_TOOLS"],
+            )
+
     def test_nerfstudio_source_is_locked(self) -> None:
         self.assertEqual(
             "50e0e3c70c775e89333256213363badbf074f29d",
