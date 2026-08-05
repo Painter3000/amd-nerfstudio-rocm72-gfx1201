@@ -15,7 +15,7 @@ import zipfile
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev4b"
+VERSION = "1.5.0-dev4c"
 SCHEMA = "amd-nerfstudio-public-installer-v1-5-nerfacc-nerfstudio"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
@@ -499,7 +499,20 @@ def verify_managed_marker(env_path: Path) -> dict[str, Any]:
     }
 
 
-def install_build_packages(python: Path) -> dict[str, Any]:
+def install_build_packages(
+    python: Path,
+    *,
+    require_global_pip_check: bool = True,
+) -> dict[str, Any]:
+    """Install and verify the pinned Python build base.
+
+    A newly created environment must already have a globally consistent
+    dependency graph. A reused managed environment may temporarily contain an
+    application-level distribution that this same installer is about to
+    remove or repair. In that case the build-base refresh verifies only the
+    pinned build packages and defers the global ``pip check`` until after the
+    repair stage.
+    """
     argv = [
         str(python), "-m", "pip", "install",
         "--disable-pip-version-check",
@@ -510,12 +523,33 @@ def install_build_packages(python: Path) -> dict[str, Any]:
     env = dict(os.environ)
     env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
     install = run_command(argv, timeout=1800, env=env)
-    pip_check = run_command([str(python), "-m", "pip", "check"], timeout=300, env=env)
+    if require_global_pip_check:
+        pip_check = run_command(
+            [str(python), "-m", "pip", "check"],
+            timeout=300,
+            env=env,
+        )
+        pip_check_passed = pip_check.get("returncode") == 0
+    else:
+        pip_check = {
+            "argv": [str(python), "-m", "pip", "check"],
+            "returncode": None,
+            "stdout": "",
+            "stderr": "",
+            "skipped": True,
+            "reason": "DEFERRED_UNTIL_APPLICATION_REPAIR",
+        }
+        pip_check_passed = True
     probe = probe_python_packages(python)
     return {
-        "passed": install.get("returncode") == 0 and pip_check.get("returncode") == 0 and probe["passed"],
+        "passed": (
+            install.get("returncode") == 0
+            and pip_check_passed
+            and probe["passed"]
+        ),
         "requirements": build_package_requirements(),
         "index": PYPI_INDEX,
+        "require_global_pip_check": require_global_pip_check,
         "install": install,
         "pip_check": pip_check,
         "probe": probe,
@@ -590,7 +624,10 @@ def prepare_environment(report: dict[str, Any]) -> dict[str, Any]:
                 "reason": "MANAGED_ENV_OWNERSHIP_UNVERIFIED",
                 "marker": marker,
             }
-        packages = install_build_packages(python)
+        packages = install_build_packages(
+            python,
+            require_global_pip_check=False,
+        )
         if not packages["passed"]:
             return {
                 "passed": False,
@@ -1273,6 +1310,120 @@ def nerfacc_python_requirements() -> list[str]:
 
 def managed_env_python(report: dict[str, Any]) -> Path:
     return Path(report["environment_selection"]["path"]) / "bin" / "python"
+
+
+def probe_distribution(python: Path, name: str) -> dict[str, Any]:
+    code = r"""
+from importlib import metadata
+import json
+import sys
+
+name = sys.argv[1]
+try:
+    version = metadata.version(name)
+except metadata.PackageNotFoundError:
+    payload = {"installed": False, "name": name, "version": None}
+else:
+    payload = {"installed": True, "name": name, "version": version}
+print(json.dumps(payload, sort_keys=True))
+"""
+    env = dict(os.environ)
+    env["PYTHONNOUSERSITE"] = "1"
+    process = run_command(
+        [str(python), "-c", code, name],
+        timeout=60,
+        env=env,
+    )
+    payload: dict[str, Any] = {}
+    if process.get("returncode") == 0 and process.get("stdout"):
+        try:
+            payload = json.loads(process["stdout"].splitlines()[-1])
+        except Exception:
+            payload = {}
+    return {
+        "passed": process.get("returncode") == 0
+        and payload.get("name") == name
+        and isinstance(payload.get("installed"), bool),
+        "payload": payload,
+        "process": process,
+    }
+
+
+def remove_stale_full_viser_distribution(
+    report: dict[str, Any],
+) -> dict[str, Any]:
+    """Remove the full Viser wheel before strict dependency checks.
+
+    dev4 installed ``viser==1.0.0`` without its viewer dependencies. dev4b
+    replaces that distribution with a hash-attested ``viser.transforms``-
+    only runtime. The stale wheel metadata must therefore be removed before
+    torch and nerfacc run their strict global ``pip check`` gates.
+    """
+    selection = report["environment_selection"]
+    if selection.get("ownership") == "EXTERNAL_EXPLICIT":
+        return {
+            "passed": False,
+            "status": "BLOCKED",
+            "reason": "EXPLICIT_EXTERNAL_ENV_IS_VERIFY_ONLY",
+            "modified": False,
+        }
+    python = managed_env_python(report)
+    before = probe_distribution(python, "viser")
+    if not before.get("passed"):
+        return {
+            "passed": False,
+            "status": "FAIL",
+            "reason": "VISER_DISTRIBUTION_PROBE_FAILED",
+            "modified": False,
+            "before": before,
+        }
+    payload = before["payload"]
+    if payload.get("installed") is False:
+        return {
+            "passed": True,
+            "status": "READY",
+            "reason": "FULL_VISER_DISTRIBUTION_ABSENT",
+            "modified": False,
+            "before": before,
+            "after": before,
+        }
+    if payload.get("version") != VISER_VERSION:
+        return {
+            "passed": False,
+            "status": "BLOCKED",
+            "reason": "UNEXPECTED_VISER_DISTRIBUTION_PRESENT",
+            "modified": False,
+            "before": before,
+        }
+    env = dict(os.environ)
+    env["PYTHONNOUSERSITE"] = "1"
+    env["PATH"] = str(python.parent) + os.pathsep + env.get("PATH", "")
+    uninstall = run_command_logged(
+        [str(python), "-m", "pip", "uninstall", "--yes", "viser"],
+        Path(report["paths"]["logs"])
+        / "installer-v1.5-viser-preflight-uninstall.log",
+        timeout=1800,
+        env=env,
+    )
+    after = probe_distribution(python, "viser")
+    passed = (
+        uninstall.get("returncode") == 0
+        and after.get("passed") is True
+        and after.get("payload", {}).get("installed") is False
+    )
+    return {
+        "passed": passed,
+        "status": "READY" if passed else "FAIL",
+        "reason": (
+            "STALE_FULL_VISER_DISTRIBUTION_REMOVED"
+            if passed
+            else "STALE_FULL_VISER_DISTRIBUTION_REMOVAL_FAILED"
+        ),
+        "modified": passed,
+        "before": before,
+        "uninstall": uninstall,
+        "after": after,
+    }
 
 
 def managed_site_packages(python: Path) -> dict[str, Any]:
@@ -2220,11 +2371,19 @@ def self_test() -> int:
             failures.append("strict pip check")
         if VISER_MATH_MARKER_SCHEMA != "amd-nerfstudio-viser-math-only-v1":
             failures.append("viser math marker schema")
+        if install_build_packages.__kwdefaults__.get(
+            "require_global_pip_check"
+        ) is not True:
+            failures.append("build refresh pip-check default")
+        if remove_stale_full_viser_distribution.__name__ != (
+            "remove_stale_full_viser_distribution"
+        ):
+            failures.append("viser cleanup stage")
     payload = {
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 20,
+        "tests": 22,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")
@@ -2265,6 +2424,7 @@ def main() -> int:
     print_report_summary(report)
 
     preparation: dict[str, Any] | None = None
+    viser_cleanup: dict[str, Any] | None = None
     torch_result: dict[str, Any] | None = None
     tiny_result: dict[str, Any] | None = None
     nerfacc_result: dict[str, Any] | None = None
@@ -2287,8 +2447,41 @@ def main() -> int:
         report["environment_preparation"] = preparation
         print_environment_preparation(preparation)
 
-    if needs_torch:
+    if args.install_nerfstudio:
         if preparation is not None and preparation.get("passed"):
+            print()
+            print("VISER_CONFLICT_CLEANUP: START")
+            viser_cleanup = remove_stale_full_viser_distribution(report)
+        else:
+            viser_cleanup = {
+                "passed": False,
+                "status": "BLOCKED",
+                "reason": "ENV_PREPARATION_FAILED",
+                "modified": False,
+            }
+        report["viser_conflict_cleanup"] = viser_cleanup
+        print()
+        print("Viser conflict cleanup:")
+        print(f"  status: {viser_cleanup.get('status')}")
+        print(f"  reason: {viser_cleanup.get('reason')}")
+        print(
+            "VISER_CONFLICT_CLEANUP: "
+            + ("PASS" if viser_cleanup.get("passed") else "FAIL")
+        )
+
+    if needs_torch:
+        pre_torch_ready = (
+            preparation is not None
+            and preparation.get("passed")
+            and (
+                not args.install_nerfstudio
+                or (
+                    viser_cleanup is not None
+                    and viser_cleanup.get("passed")
+                )
+            )
+        )
+        if pre_torch_ready:
             print()
             print("ROCM_PYTORCH_STAGE: START")
             print(f"index: {PYTORCH_INDEX}")
@@ -2296,7 +2489,17 @@ def main() -> int:
                 print(f"  - {requirement}")
             torch_result = install_torch_stack(report)
         else:
-            torch_result = {"passed": False, "status": "BLOCKED", "reason": "ENV_PREPARATION_FAILED"}
+            torch_result = {
+                "passed": False,
+                "status": "BLOCKED",
+                "reason": (
+                    "VISER_CONFLICT_CLEANUP_REQUIRED"
+                    if preparation is not None
+                    and preparation.get("passed")
+                    and args.install_nerfstudio
+                    else "ENV_PREPARATION_FAILED"
+                ),
+            }
         report["torch_installation"] = torch_result
         print()
         print("torch installation:")
@@ -2372,7 +2575,14 @@ def main() -> int:
         print(f"NERFSTUDIO_INSTALL: {'PASS' if nerfstudio_result.get('passed') else 'FAIL'}")
 
     passed = report.get("passed") is True
-    for result in (preparation, torch_result, tiny_result, nerfacc_result, nerfstudio_result):
+    for result in (
+        preparation,
+        viser_cleanup,
+        torch_result,
+        tiny_result,
+        nerfacc_result,
+        nerfstudio_result,
+    ):
         if result is not None:
             passed = passed and result.get("passed") is True
 

@@ -4,6 +4,7 @@
     "explicit_external_env": "VERIFY_ONLY_NO_MODIFICATION",
     "failure_cleanup": "REMOVE_ONLY_ENV_CREATED_BY_CURRENT_INVOCATION_WHILE_MARKED_INCOMPLETE",
     "managed_marker": ".amd-nerfstudio-managed-v1.json",
+    "managed_reuse_global_pip_check": "DEFER_UNTIL_APPLICATION_REPAIR_AND_FINAL_STRICT_CLOSURE",
     "mode": "MANAGED_ENV_CREATE_OR_REFRESH",
     "packages": {
       "cmake": "4.4.0",
@@ -21,7 +22,8 @@
     "explicit_env_priority": true,
     "managed_env_search_path": "venv",
     "repair_external_env_in_place": false,
-    "scan_other_directories": false
+    "scan_other_directories": false,
+    "stale_full_viser_cleanup": "REMOVE_ONLY_EXACT_VISER_1_0_0_FROM_MANAGED_ENV_BEFORE_TORCH_QUALIFICATION"
   },
   "host_packages": [
     "build-essential",
@@ -218,5 +220,5 @@
     "tag": "phase4a2-model-b-public-gfx1201-pass",
     "url": "https://github.com/Painter3000/tiny-rdna4-nn.git"
   },
-  "version": "1.5.0-dev4b"
+  "version": "1.5.0-dev4c"
 }

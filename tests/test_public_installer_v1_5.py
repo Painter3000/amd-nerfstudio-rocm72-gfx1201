@@ -75,6 +75,97 @@ class PublicInstallerV15Tests(unittest.TestCase):
             installer.build_package_requirements(),
         )
 
+    def test_reused_build_refresh_defers_global_pip_check(self) -> None:
+        calls = []
+        original_run_command = installer.run_command
+        original_probe = installer.probe_python_packages
+
+        def fake_run_command(argv, timeout=120, env=None):
+            calls.append(list(argv))
+            return {
+                "argv": list(argv),
+                "returncode": 0,
+                "stdout": "",
+                "stderr": "",
+            }
+
+        try:
+            installer.run_command = fake_run_command
+            installer.probe_python_packages = lambda python: {
+                "passed": True,
+                "packages": {},
+            }
+            result = installer.install_build_packages(
+                Path("/managed/bin/python"),
+                require_global_pip_check=False,
+            )
+        finally:
+            installer.run_command = original_run_command
+            installer.probe_python_packages = original_probe
+
+        self.assertTrue(result["passed"])
+        self.assertTrue(result["pip_check"]["skipped"])
+        self.assertFalse(
+            any(command[-2:] == ["pip", "check"] for command in calls)
+        )
+
+    def test_stale_full_viser_is_removed_before_strict_checks(self) -> None:
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            report = {
+                "environment_selection": {
+                    "ownership": "MANAGED_AUTODETECTED",
+                    "path": str(root / "venv"),
+                },
+                "paths": {
+                    "logs": str(root / "logs"),
+                },
+            }
+            probes = iter(
+                (
+                    {
+                        "passed": True,
+                        "payload": {
+                            "installed": True,
+                            "name": "viser",
+                            "version": "1.0.0",
+                        },
+                        "process": {"returncode": 0},
+                    },
+                    {
+                        "passed": True,
+                        "payload": {
+                            "installed": False,
+                            "name": "viser",
+                            "version": None,
+                        },
+                        "process": {"returncode": 0},
+                    },
+                )
+            )
+            original_probe = installer.probe_distribution
+            original_logged = installer.run_command_logged
+            try:
+                installer.probe_distribution = lambda python, name: next(probes)
+                installer.run_command_logged = lambda *args, **kwargs: {
+                    "returncode": 0,
+                    "stdout": "",
+                    "stderr": "",
+                }
+                result = installer.remove_stale_full_viser_distribution(
+                    report
+                )
+            finally:
+                installer.probe_distribution = original_probe
+                installer.run_command_logged = original_logged
+
+        self.assertTrue(result["passed"])
+        self.assertTrue(result["modified"])
+        self.assertEqual(
+            "STALE_FULL_VISER_DISTRIBUTION_REMOVED",
+            result["reason"],
+        )
+
     def test_managed_marker_contract(self) -> None:
         with tempfile.TemporaryDirectory() as td:
             env = Path(td) / "venv"
