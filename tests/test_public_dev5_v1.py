@@ -15,6 +15,9 @@ DEPLOY = ROOT / "tools/deploy_public_quick_dataset_v2.py"
 DEV5 = ROOT / "tools/run_public_dev5_p0_p1_v1.py"
 CONTRACT = ROOT / "config/quick_validation_dataset_v2.json"
 WRAPPER = ROOT / "scripts/run_public_dev5_p0_p1_v1.sh"
+REFERENCE = ROOT / "config/reference_gfx1201_rocm72.json"
+FRESH_RESOURCES = ROOT / "config/public_fresh_env_resources_v1.json"
+P1_RUNNER = ROOT / "tools/run_public_a5p1_nerfacto_smoke_v1.py"
 
 
 def load_module(path: Path, name: str):
@@ -72,8 +75,32 @@ class PublicDev5Tests(unittest.TestCase):
             self.dev5.EXPECTED_TINY_NATIVE_SHA,
         )
         self.assertEqual(
+            "6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a",
+            self.dev5.EXPECTED_TINY_MODULES_SHA,
+        )
+        self.assertEqual(
             "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
             self.dev5.EXPECTED_NERFACC_NATIVE_SHA,
+        )
+
+    def test_active_tiny_modules_hashes_are_aligned(self):
+        expected = "6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a"
+        reference = json.loads(REFERENCE.read_text(encoding="utf-8"))
+        fresh = json.loads(FRESH_RESOURCES.read_text(encoding="utf-8"))
+        p1 = P1_RUNNER.read_text(encoding="utf-8")
+
+        self.assertEqual(
+            expected,
+            reference["runtime"]["tinycudann_modules_sha256"],
+        )
+        self.assertEqual(
+            expected,
+            fresh["custom_resources"]["tiny_rdna4_runtime"]["modules_sha256"],
+        )
+        self.assertEqual(1, p1.count(expected))
+        self.assertNotIn(
+            "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
+            p1,
         )
 
     def test_nerfacc_probe_uses_qualified_load_order_and_library_path(self):

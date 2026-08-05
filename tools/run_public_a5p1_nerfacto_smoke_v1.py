@@ -29,7 +29,7 @@ EXPECTED = {
     'nerfstudio_tree': '9d5ff468eeff89b66995e9984acaa378c37dc07e',
     'nerfstudio_mlp': '4939a5a6901d82d8e310d93e2a135ca57ccc1bd79be79a7f67e2740e730c44ad',
     'tinycudann_native': '4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917',
-    'tinycudann_modules': 'b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12',
+    'tinycudann_modules': '6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a',
     'nerfacc_native': 'd3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2',
     'torch': '2.13.0+rocm7.2',
     'hip': '7.2.53211',

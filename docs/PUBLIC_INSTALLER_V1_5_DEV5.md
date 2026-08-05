@@ -161,3 +161,18 @@ Dev5b preserves the absolute lexical path ``.../venv/bin/python`` while keeping
 the real path as diagnostics only.  It derives the Python ABI directory from
 the target interpreter, requires ``python3.12``, records both paths, and keeps
 all 28 fail-closed gates unchanged.
+
+## dev5c active `tinycudann/modules.py` anchor correction
+
+The dev5b P0 child successfully imported the pinned runtime, the viewer-free
+Nerfacto configuration, `nerfacc`, and the RDNA4 native extension. P0 was
+blocked only because the active v1.5 reference still carried the earlier
+`tinycudann/modules.py` hash while the pinned source and deployed runtime both
+carry the current public Model-B wrapper.
+
+Dev5c verifies the pinned tiny-rdna4-nn source commit and tree, requires the
+source and deployed runtime copies of `tinycudann/modules.py` to be byte-exact,
+and then aligns all active v1.5 consumers: the P0 reference, fresh-environment
+resource contract, dev5 pre-gate, and P1 runtime identity. Historical frozen
+A5 evidence and the top-level historical runtime table are intentionally not
+rewritten.

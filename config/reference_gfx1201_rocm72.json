@@ -28,7 +28,7 @@
   "runtime": {
     "nerfacc_native_sha256": "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2",
     "tinycudann_modules_relative_path": "tinycudann/modules.py",
-    "tinycudann_modules_sha256": "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
+    "tinycudann_modules_sha256": "6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a",
     "tinycudann_native_glob": "tinycudann_bindings/_120_C*.so",
     "tinycudann_native_sha256": "4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917",
     "tinycudann_source": {

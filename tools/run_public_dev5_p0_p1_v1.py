@@ -20,6 +20,7 @@ CLASSIFICATION = "PUBLIC_DEV5_DATASET_DEPLOYMENT_PLUS_REAL_NERFACTO_P0_P1"
 EXPECTED_NERFSTUDIO_COMMIT = "50e0e3c70c775e89333256213363badbf074f29d"
 EXPECTED_NERFSTUDIO_TREE = "9d5ff468eeff89b66995e9984acaa378c37dc07e"
 EXPECTED_TINY_NATIVE_SHA = "4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917"
+EXPECTED_TINY_MODULES_SHA = "6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a"
 EXPECTED_NERFACC_NATIVE_SHA = "d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2"
 
 P1_CHECKS = [
@@ -356,11 +357,18 @@ def orchestrate(args: argparse.Namespace) -> int:
     ns_identity["pinned"] = bool(ns_identity.get("passed") and ns_identity["commit_matches"] and ns_identity["tree_matches"])
 
     tiny_native = find_exact_one(tcnn_runtime, "tinycudann_bindings/_120_C*.so")
+    tiny_modules = tcnn_runtime / "tinycudann" / "modules.py"
     tiny_identity = {
-        "path": str(tiny_native) if tiny_native else None,
-        "sha256": sha256(tiny_native) if tiny_native else None,
+        "native_path": str(tiny_native) if tiny_native else None,
+        "native_sha256": sha256(tiny_native) if tiny_native else None,
+        "modules_path": str(tiny_modules),
+        "modules_sha256": sha256(tiny_modules) if tiny_modules.is_file() else None,
     }
-    tiny_identity["passed"] = tiny_identity["sha256"] == EXPECTED_TINY_NATIVE_SHA
+    tiny_identity["checks"] = {
+        "native_hash": tiny_identity["native_sha256"] == EXPECTED_TINY_NATIVE_SHA,
+        "modules_hash": tiny_identity["modules_sha256"] == EXPECTED_TINY_MODULES_SHA,
+    }
+    tiny_identity["passed"] = all(tiny_identity["checks"].values())
     nerfacc_identity = probe_nerfacc(python, nerfstudio, tcnn_runtime)
 
     quick_process: dict[str, Any] = {"skipped": True, "reason": "DATASET_OR_RUNTIME_PREFLIGHT_FAILED"}
