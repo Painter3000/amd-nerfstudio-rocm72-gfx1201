@@ -91,6 +91,24 @@ class PublicDev5Tests(unittest.TestCase):
         self.assertIn("DEV5_NERFACC_JSON=", probe)
         self.assertIn('"load_order": "torch_then_nerfacc_csrc"', probe)
 
+    def test_dev5_preserves_managed_python_symlink_path(self):
+        source = DEV5.read_text(encoding="utf-8")
+        self.assertNotIn(
+            "python = args.python.expanduser().resolve()",
+            source,
+        )
+        self.assertIn(
+            "python = Path(os.path.abspath(os.path.expanduser(str(args.python))))",
+            source,
+        )
+        probe_start = source.index("def probe_nerfacc")
+        probe_end = source.index("\ndef create_gate", probe_start)
+        probe = source[probe_start:probe_end]
+        self.assertIn("python_version_probe", probe)
+        self.assertIn("managed_python_path_preserved", probe)
+        self.assertIn("python.parent.parent", probe)
+        self.assertIn('pyver == "python3.12"', probe)
+
     def test_tools_self_tests(self):
         for script in (DEPLOY, DEV5):
             proc = subprocess.run(

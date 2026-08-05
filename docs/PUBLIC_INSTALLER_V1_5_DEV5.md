@@ -149,3 +149,15 @@ nerfacc identity probe:
 
 The failed dev5 evidence archive remains immutable historical evidence. A
 dev5a execution creates a new run ID and evidence archive.
+
+## dev5b managed-Python path correction
+
+Dev5a corrected the native load order, but the orchestrator still resolved the
+managed virtual-environment Python symlink to ``/usr/bin/python3.12``.  The
+nerfacc child then derived ``torch/lib`` below ``/usr`` instead of below the
+managed environment and failed before P0.
+
+Dev5b preserves the absolute lexical path ``.../venv/bin/python`` while keeping
+the real path as diagnostics only.  It derives the Python ABI directory from
+the target interpreter, requires ``python3.12``, records both paths, and keeps
+all 28 fail-closed gates unchanged.

@@ -185,7 +185,17 @@ print("DEV5_NERFACC_JSON=" + json.dumps(out, sort_keys=True))
         pythonpath_parts.append(previous_pythonpath)
     env["PYTHONPATH"] = os.pathsep.join(pythonpath_parts)
 
-    pyver = f"python{sys.version_info.major}.{sys.version_info.minor}"
+    version_probe = run_command(
+        [
+            str(python),
+            "-c",
+            "import sys; print(f'python{sys.version_info.major}.{sys.version_info.minor}')",
+        ],
+        cwd=Path("/tmp"),
+        env=env,
+        timeout=30,
+    )
+    pyver = version_probe.get("stdout", "").strip()
     torch_lib = python.parent.parent / f"lib/{pyver}/site-packages/torch/lib"
     previous_ld = env.get("LD_LIBRARY_PATH", "")
     ld_parts = [
@@ -224,8 +234,13 @@ print("DEV5_NERFACC_JSON=" + json.dumps(out, sort_keys=True))
     payload["environment"] = {
         "PYTHONPATH": env["PYTHONPATH"],
         "LD_LIBRARY_PATH": env["LD_LIBRARY_PATH"],
+        "python_argument": str(python),
+        "python_realpath": str(python.resolve()),
+        "python_version_probe": version_probe,
+        "python_version_directory": pyver,
         "torch_lib": str(torch_lib),
         "torch_lib_exists": torch_lib.is_dir(),
+        "managed_python_path_preserved": python.parent.name == "bin",
         "load_order": "torch_then_nerfacc_csrc",
     }
     payload["checks"] = {
@@ -236,6 +251,11 @@ print("DEV5_NERFACC_JSON=" + json.dumps(out, sort_keys=True))
         "cuda_available": payload.get("cuda_available") is True,
         "gcn_arch": payload.get("gcn_arch") == "gfx1201",
         "native_hash": payload.get("sha256") == EXPECTED_NERFACC_NATIVE_SHA,
+        "python_version_probe": (
+            version_probe.get("returncode") == 0
+            and pyver == "python3.12"
+        ),
+        "managed_python_path_preserved": python.parent.name == "bin",
         "torch_lib": torch_lib.is_dir(),
     }
     payload["passed"] = all(payload["checks"].values())
@@ -302,7 +322,7 @@ def write_deterministic_archive(source: Path, destination: Path) -> str:
 
 def orchestrate(args: argparse.Namespace) -> int:
     repo_root = Path(__file__).resolve().parents[1]
-    python = args.python.expanduser().resolve()
+    python = Path(os.path.abspath(os.path.expanduser(str(args.python))))
     nerfstudio = args.nerfstudio_worktree.expanduser().resolve()
     tcnn_runtime = args.tcnn_runtime.expanduser().resolve()
     dataset_archive = args.dataset_archive.expanduser().resolve()
