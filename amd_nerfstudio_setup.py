@@ -14,8 +14,8 @@ import tempfile
 from datetime import datetime, timezone
 from typing import Any, Callable
 
-VERSION = "1.5.0-dev3"
-SCHEMA = "amd-nerfstudio-public-installer-v1-5-torch-tiny-native"
+VERSION = "1.5.0-dev3a"
+SCHEMA = "amd-nerfstudio-public-installer-v1-5-torch-tiny-native-hotfix1"
 REPO_NAME = "amd-nerfstudio-rocm72-gfx1201"
 MANAGED_ENV_NAME = "venv"
 SUPPORTED_ARCH = "gfx1201"
@@ -908,6 +908,67 @@ def acquire_tiny_source(report: dict[str, Any]) -> dict[str, Any]:
             shutil.rmtree(staging, ignore_errors=True)
 
 
+def compose_runtime_library_path(
+    torch_lib: Path,
+    rocm_path: Path,
+    existing: str | None = None,
+) -> str:
+    """Build the loader path used to inspect one ENV-bound torch extension.
+
+    A bare ``ldd`` call does not know where a virtual environment keeps
+    ``libc10.so`` and the other PyTorch shared libraries. The real Python
+    import does know this through torch's loader setup. For a meaningful
+    dependency audit we therefore place the selected environment's
+    ``torch/lib`` directory first, followed by the requested ROCm libraries
+    and any caller-provided loader path.
+    """
+    candidates = [
+        str(torch_lib),
+        str(rocm_path / "lib"),
+        str(rocm_path / "lib64"),
+    ]
+    if existing:
+        candidates.extend(value for value in existing.split(os.pathsep) if value)
+    ordered: list[str] = []
+    seen: set[str] = set()
+    for value in candidates:
+        if value and value not in seen:
+            ordered.append(value)
+            seen.add(value)
+    return os.pathsep.join(ordered)
+
+
+def probe_torch_library_dir(python: Path) -> dict[str, Any]:
+    code = r'''
+from importlib.util import find_spec
+from pathlib import Path
+
+spec = find_spec("torch")
+if spec is None or spec.origin is None:
+    raise SystemExit(2)
+path = (Path(spec.origin).resolve().parent / "lib").resolve()
+print(path)
+raise SystemExit(0 if path.is_dir() else 2)
+'''
+    process = run_command([str(python), "-c", code], timeout=60)
+    path: Path | None = None
+    if process.get("returncode") == 0:
+        lines = [
+            line.strip()
+            for line in process.get("stdout", "").splitlines()
+            if line.strip()
+        ]
+        if lines:
+            candidate = Path(lines[-1])
+            if candidate.is_dir():
+                path = candidate
+    return {
+        "passed": path is not None,
+        "path": str(path) if path is not None else None,
+        "process": process,
+    }
+
+
 def verify_tiny_runtime(runtime: Path, python: Path, rocm_path: Path, arch: str) -> dict[str, Any]:
     marker = runtime / TINY_RUNTIME_MARKER
     binary = runtime / "tinycudann_bindings" / "_120_C.cpython-312-x86_64-linux-gnu.so"
@@ -918,7 +979,23 @@ def verify_tiny_runtime(runtime: Path, python: Path, rocm_path: Path, arch: str)
         except Exception:
             marker_payload = {}
     roc_obj = run_command([str(rocm_path / "bin" / "roc-obj-ls"), str(binary)], timeout=300) if binary.is_file() else {"returncode": None, "stdout": "", "stderr": "binary missing"}
-    ldd = run_command(["ldd", str(binary)], timeout=300) if binary.is_file() else {"returncode": None, "stdout": "", "stderr": "binary missing"}
+    ldd_bare = run_command(["ldd", str(binary)], timeout=300) if binary.is_file() else {"returncode": None, "stdout": "", "stderr": "binary missing"}
+    torch_library = probe_torch_library_dir(python)
+    ldd_env = dict(os.environ)
+    if torch_library.get("passed"):
+        ldd_env["LD_LIBRARY_PATH"] = compose_runtime_library_path(
+            Path(torch_library["path"]),
+            rocm_path,
+            ldd_env.get("LD_LIBRARY_PATH"),
+        )
+        ldd = run_command(["ldd", str(binary)], timeout=300, env=ldd_env) if binary.is_file() else {"returncode": None, "stdout": "", "stderr": "binary missing"}
+    else:
+        ldd = {
+            "argv": ["ldd", str(binary)],
+            "returncode": None,
+            "stdout": "",
+            "stderr": "torch library directory unavailable",
+        }
     import_code = r'''
 import json
 import pathlib
@@ -973,6 +1050,7 @@ raise SystemExit(0 if payload["passed"] else 2)
         "binary_hash": marker_payload.get("native_sha256") == binary_hash,
         "binary_contains_arch": binary.is_file() and arch.encode() in binary.read_bytes(),
         "roc_obj_ls": roc_obj.get("returncode") == 0 and f"--{arch}" in roc_obj.get("stdout", ""),
+        "torch_library_dir": torch_library.get("passed") is True,
         "ldd": ldd.get("returncode") == 0 and "not found" not in (ldd.get("stdout", "") + ldd.get("stderr", "")),
         "runtime_smoke": imported.get("returncode") == 0 and import_payload.get("passed") is True,
         "runtime_origin": Path(import_payload.get("native", "/__missing__")).is_file() and runtime in Path(import_payload.get("native", "/__missing__")).resolve().parents,
@@ -985,6 +1063,11 @@ raise SystemExit(0 if payload["passed"] else 2)
         "checks": checks,
         "marker": marker_payload,
         "roc_obj_ls": roc_obj,
+        "torch_library_probe": torch_library,
+        "ldd_environment": {
+            "LD_LIBRARY_PATH": ldd_env.get("LD_LIBRARY_PATH") if torch_library.get("passed") else None,
+        },
+        "ldd_bare": ldd_bare,
         "ldd": ldd,
         "runtime_smoke": {"process": imported, "payload": import_payload},
     }
@@ -1070,7 +1153,7 @@ def build_tiny_runtime(report: dict[str, Any], max_jobs: int = 8) -> dict[str, A
             env=env,
         )
         if compiled.get("returncode") != 0:
-            return {"passed": False, "status": "FAIL", "reason": "TINY_NATIVE_BUILD_FAILED", "source": source_result, "build": compiled}
+            return {"passed": False, "status": "FAIL", "reason": "TINY_NATIVE_BUILD_FAILED", "source": source_result, "build": compiled, "modified": True}
         post_source = verify_tiny_source(source)
         if not post_source.get("passed"):
             return {
@@ -1080,10 +1163,11 @@ def build_tiny_runtime(report: dict[str, Any], max_jobs: int = 8) -> dict[str, A
                 "source": source_result,
                 "post_source": post_source,
                 "build": compiled,
+                "modified": True,
             }
         matches = sorted((build / "tcnn" / "lib").glob("tinycudann_bindings/_120_C.cpython-312-x86_64-linux-gnu.so"))
         if len(matches) != 1:
-            return {"passed": False, "status": "FAIL", "reason": "TINY_NATIVE_OUTPUT_COUNT_INVALID", "matches": [str(path) for path in matches], "build": compiled}
+            return {"passed": False, "status": "FAIL", "reason": "TINY_NATIVE_OUTPUT_COUNT_INVALID", "matches": [str(path) for path in matches], "build": compiled, "modified": True}
         shutil.copytree(build / "tcnn" / "lib", staging_runtime, symlinks=True)
         shutil.copytree(source / "bindings" / "torch" / "tinycudann", staging_runtime / "tinycudann", symlinks=True)
         binary = staging_runtime / "tinycudann_bindings" / "_120_C.cpython-312-x86_64-linux-gnu.so"
@@ -1113,7 +1197,7 @@ def build_tiny_runtime(report: dict[str, Any], max_jobs: int = 8) -> dict[str, A
         staging_runtime.rename(runtime)
         verification = verify_tiny_runtime(runtime, python, rocm, SUPPORTED_ARCH)
         if not verification.get("passed"):
-            return {"passed": False, "status": "FAIL", "reason": "BUILT_TINY_RUNTIME_FAILED_ATTESTATION", "source": source_result, "build": compiled, "runtime": verification}
+            return {"passed": False, "status": "FAIL", "reason": "BUILT_TINY_RUNTIME_FAILED_ATTESTATION", "source": source_result, "build": compiled, "runtime": verification, "modified": True}
         runtime_ready = True
         return {
             "passed": True,
@@ -1345,11 +1429,23 @@ def self_test() -> int:
             failures.append("tiny commit lock")
         if TINY_TAG != "phase4a2-model-b-public-gfx1201-pass":
             failures.append("tiny tag lock")
+        loader = compose_runtime_library_path(
+            Path("/env/torch/lib"),
+            Path("/opt/rocm"),
+            "/custom/lib:/env/torch/lib",
+        ).split(os.pathsep)
+        if loader != [
+            "/env/torch/lib",
+            "/opt/rocm/lib",
+            "/opt/rocm/lib64",
+            "/custom/lib",
+        ]:
+            failures.append("environment-aware ldd path")
     payload = {
         "schema": SCHEMA,
         "passed": not failures,
         "failures": failures,
-        "tests": 10,
+        "tests": 11,
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     print(f"PUBLIC_INSTALLER_V1_5_SELF_TEST: {'PASS' if not failures else 'FAIL'}")

@@ -131,6 +131,22 @@ class PublicInstallerV15Tests(unittest.TestCase):
         self.assertFalse(result["modified"])
         self.assertEqual("EXPLICIT_EXTERNAL_ENV_IS_VERIFY_ONLY", result["reason"])
 
+    def test_runtime_library_path_is_environment_aware(self) -> None:
+        value = installer.compose_runtime_library_path(
+            Path("/env/torch/lib"),
+            Path("/opt/rocm"),
+            "/custom/lib:/env/torch/lib",
+        )
+        self.assertEqual(
+            [
+                "/env/torch/lib",
+                "/opt/rocm/lib",
+                "/opt/rocm/lib64",
+                "/custom/lib",
+            ],
+            value.split(installer.os.pathsep),
+        )
+
     def test_tiny_build_requires_passing_preflight(self) -> None:
         result = installer.build_tiny_runtime({"passed": False})
         self.assertFalse(result["passed"])

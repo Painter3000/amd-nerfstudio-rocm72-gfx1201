@@ -108,7 +108,7 @@ It then:
 4. compiles only the tiny-rdna4-nn Python extension with the qualified
    Phase-4A HIPCC compatibility shim;
 5. assembles `$WORKDIR/runtime/tiny-rdna4-nn`;
-6. verifies `_120_C.cpython-312-x86_64-linux-gnu.so` with `roc-obj-ls`, `ldd`,
+6. verifies `_120_C.cpython-312-x86_64-linux-gnu.so` with `roc-obj-ls`, an environment-aware `ldd`,
    local SHA256 recording, Python import, and a real `RocWMMAWidth64MLP`
    forward/backward GPU smoke test.
 
@@ -135,3 +135,21 @@ pinned Python build tooling, qualified ROCm PyTorch installation/reuse, locked
 recursive tiny-rdna4-nn acquisition, local gfx1201 compilation, runtime
 assembly, and native attestation. Nerfacc installation, Nerfstudio installation,
 dataset deployment, and P0/P1 remain later v1.5 stages.
+
+### Environment-aware native dependency audit
+
+A bare `ldd` invocation is retained as diagnostic evidence, but it is not the
+compatibility gate for a Python extension linked against PyTorch. Libraries
+such as `libc10.so`, `libtorch.so`, `libtorch_cpu.so`, and
+`libtorch_python.so` live below the selected environment's `torch/lib`
+directory and are not system libraries. The gating audit therefore executes
+`ldd` with `LD_LIBRARY_PATH` composed from:
+
+1. the selected environment's `torch/lib`,
+2. the requested ROCm `lib` and `lib64` directories, and
+3. any pre-existing loader path.
+
+The real GPU forward/backward import smoke remains mandatory. A bare `ldd`
+showing environment-local Torch libraries as `not found` is recorded but is
+not treated as a build failure when the environment-aware audit and runtime
+smoke both pass.

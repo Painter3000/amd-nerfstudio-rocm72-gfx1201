@@ -78,6 +78,7 @@
       "SOURCE_TAG_AND_COMMIT",
       "SUBMODULE_GITLINKS",
       "GFX1201_CODE_OBJECT",
+      "ENVIRONMENT_AWARE_LDD",
       "PYTHON_IMPORT",
       "GPU_RUNTIME_SMOKE",
       "LOCAL_SHA256_RECORD"
@@ -89,6 +90,11 @@
       "TCNN_HALF_PRECISION": "1",
       "TCNN_ENABLE_ROCWMMA_WIDTH64_MLP": "1",
       "ROCM_TOOLCHAIN": "DIRECT_CLANG_VIA_PHASE4A_HIPCC_COMPAT_SHIM"
+    },
+    "dynamic_link_audit": {
+      "bare_ldd": "DIAGNOSTIC_ONLY",
+      "gating_ldd": "LD_LIBRARY_PATH_INCLUDES_SELECTED_ENV_TORCH_LIB_AND_REQUESTED_ROCM_LIB",
+      "reason": "PyTorch shared libraries are environment-local and are not discoverable by a bare ldd invocation."
     }
   },
   "quick_validation_dataset_v2": {
