@@ -1,5 +1,63 @@
 # Changelog
 
+## v1.5.0 - Qualified managed gfx1201 Nerfacto installer
+
+### Added
+
+- add the managed Python 3.12 installer entry point for the pinned ROCm 7.2,
+  PyTorch `2.13.0+rocm7.2`, tiny-rdna4-nn, nerfacc, and scoped Nerfstudio
+  Nerfacto runtime;
+- add local native tiny-rdna4-nn build and attestation for `gfx1201`;
+- add installation and native-identity verification for the authorized,
+  hash-locked nerfacc wheel;
+- add the CC0 synthetic six-view quick-validation dataset and atomic,
+  fail-closed deployment contract;
+- add the fixed 28-gate public Dev5 P0/P1 orchestrator and deterministic
+  evidence archive;
+- add final human-readable and machine-readable qualification reports.
+
+### Compatibility
+
+- rewrite known Nerfstudio TCNN MLP configurations to the AMD-qualified
+  `PortableMLP` backend and reject unknown backend names;
+- install scoped Pillow 12.2 raw-encoder extents compatibility without
+  modifying the Pillow distribution or pinned Nerfstudio source;
+- install the compatibility inside Nerfstudio's real spawned DataLoader worker
+  through the top-level
+  `public_nerfacto_config_v1.public_spawn_worker_init` hook;
+- preserve the single-worker `spawn` topology and fail closed on unqualified
+  pre-existing worker hooks.
+
+### Qualification
+
+- qualify the implementation at commit
+  `d73e72615bba404dc8e6b105674890f4abcb6311` and tree
+  `787e8e296e55cccc2b0df21106ecb951a9d9f343`;
+- freeze the qualification at commit
+  `d9555c83183c89bf9e9a79fc77cc1c0c6b9d6c16`;
+- merge the qualified state to `main` through merge commit
+  `117d625d8925c90f99222f18a0cb22eec90b31fa`;
+- pass all 28 declared P0/P1 gates with zero failures, zero blockers, and no
+  replacement runs;
+- demonstrate real DataLoader, forward, finite loss, backward gradients,
+  optimizer update, checkpoint write/hash, exact fresh-process reload, and
+  fresh-process resume mechanics;
+- record evidence archive SHA-256
+  `9f104f5fac3b434852e0f31483cd2b421964654641b8454666c8f6911c53556c`;
+- keep P2 `NOT_RUN` and `MAINTAINER_ONLY` for this public release
+  qualification.
+
+### Runtime anchors
+
+- tiny-rdna4-nn native SHA-256:
+  `4a561cc605bb7a6353d0eca1f9effc5ac9fcdfa3a9cb605a8cf36e1ae25b1917`;
+- active `tinycudann/modules.py` SHA-256:
+  `6555845d9483f672feefeef3b7ca5a264737ffe0e43ead1bbdebb661d6a3663a`;
+- nerfacc native SHA-256:
+  `d3beee150cfa3a9ad3038a3283ff0a46953c345634d8cb6109449c5e3d04d1e2`;
+- quick-validation dataset archive SHA-256:
+  `0a968da041884f1f815bc9176aef1a13dc72beb7531e25c5c98cf24db1db25ac`.
+
 ## v1.4.3 - Existing-environment advisory package policy
 
 - keep the Fresh-ENV wheelhouse and installed-runtime package exclusions strict;
