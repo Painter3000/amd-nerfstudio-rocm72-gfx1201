@@ -8,6 +8,7 @@ import subprocess
 import sys
 sys.dont_write_bytecode = True
 import tempfile
+import types
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -18,6 +19,8 @@ WRAPPER = ROOT / "scripts/run_public_dev5_p0_p1_v1.sh"
 REFERENCE = ROOT / "config/reference_gfx1201_rocm72.json"
 FRESH_RESOURCES = ROOT / "config/public_fresh_env_resources_v1.json"
 P1_RUNNER = ROOT / "tools/run_public_a5p1_nerfacto_smoke_v1.py"
+P0_RUNNER = ROOT / "tools/run_public_a5p0_preflight_v1.py"
+NERFACTO_CONFIG = ROOT / "tools/public_nerfacto_config_v1.py"
 
 
 def load_module(path: Path, name: str):
@@ -102,6 +105,73 @@ class PublicDev5Tests(unittest.TestCase):
             "b4df43b54f64fe2b31272a997aafd50137aecac411d59b05251acedcd5512d12",
             p1,
         )
+
+
+    def test_portable_mlp_policy_rewrites_known_backends_and_rejects_unknown(self):
+        config_module = load_module(
+            NERFACTO_CONFIG,
+            "public_nerfacto_config_v1_dev5d_test",
+        )
+        module_names = [
+            "nerfstudio",
+            "nerfstudio.field_components",
+            "nerfstudio.field_components.mlp",
+        ]
+        saved = {name: sys.modules.get(name) for name in module_names}
+        try:
+            nerfstudio = types.ModuleType("nerfstudio")
+            nerfstudio.__path__ = []
+            field_components = types.ModuleType("nerfstudio.field_components")
+            field_components.__path__ = []
+            mlp_module = types.ModuleType("nerfstudio.field_components.mlp")
+
+            class FakeMLP:
+                @classmethod
+                def get_tcnn_network_config(
+                    cls,
+                    activation,
+                    out_activation,
+                    layer_width,
+                    num_layers,
+                ):
+                    del cls, activation, out_activation, num_layers
+                    if layer_width == 99:
+                        otype = "UnknownMLP"
+                    elif layer_width in {16, 32, 64, 128}:
+                        otype = "FullyFusedMLP"
+                    else:
+                        otype = "CutlassMLP"
+                    return {
+                        "otype": otype,
+                        "n_neurons": layer_width,
+                    }
+
+            mlp_module.MLP = FakeMLP
+            nerfstudio.field_components = field_components
+            field_components.mlp = mlp_module
+            sys.modules["nerfstudio"] = nerfstudio
+            sys.modules["nerfstudio.field_components"] = field_components
+            sys.modules["nerfstudio.field_components.mlp"] = mlp_module
+
+            policy = config_module.install_rdna4_portable_mlp_policy()
+            fused = FakeMLP.get_tcnn_network_config(object(), None, 64, 2)
+            cutlass = FakeMLP.get_tcnn_network_config(object(), None, 48, 2)
+
+            self.assertEqual("PortableMLP", fused["otype"])
+            self.assertEqual("PortableMLP", cutlass["otype"])
+            self.assertEqual(64, fused["n_neurons"])
+            self.assertEqual("PortableMLP", policy["effective_otype"])
+            self.assertTrue(policy["fail_closed_unknown_otype"])
+            self.assertFalse(policy["native_runtime_modified"])
+            self.assertFalse(policy["nerfstudio_source_modified"])
+            with self.assertRaises(RuntimeError):
+                FakeMLP.get_tcnn_network_config(object(), None, 99, 2)
+        finally:
+            for name, previous in saved.items():
+                if previous is None:
+                    sys.modules.pop(name, None)
+                else:
+                    sys.modules[name] = previous
 
     def test_nerfacc_probe_uses_qualified_load_order_and_library_path(self):
         source = DEV5.read_text(encoding="utf-8")

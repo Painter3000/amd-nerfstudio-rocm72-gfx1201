@@ -176,3 +176,19 @@ and then aligns all active v1.5 consumers: the P0 reference, fresh-environment
 resource contract, dev5 pre-gate, and P1 runtime identity. Historical frozen
 A5 evidence and the top-level historical runtime table are intentionally not
 rewritten.
+
+## dev5d explicit PortableMLP configuration policy
+
+The first real dev5c P1 producer reached Nerfacto model construction and then
+failed before dataset iteration because the pinned Nerfstudio MLP helper emits
+`FullyFusedMLP` for its standard layer widths.  The qualified AMD portable
+runtime intentionally rejects that CUDA-specific backend and requires
+`PortableMLP`.
+
+Dev5d leaves both pinned source trees and the native runtime unchanged.  The
+scoped public Nerfacto configuration installs a fail-closed class-level policy
+that preserves every activation, width, layer-count, and output setting while
+rewriting only the TCNN network `otype` from the known upstream values
+`FullyFusedMLP` or `CutlassMLP` to `PortableMLP`.  Unknown backend names are
+rejected.  P0 records and verifies the policy before emitting its runtime
+policy, and P1 independently checks the same policy before trainer setup.

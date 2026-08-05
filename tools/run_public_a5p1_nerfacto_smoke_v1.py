@@ -467,8 +467,13 @@ def loaded_tcnn_origins() -> dict[str, str]:
 
 
 def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, rays: int, checkpoint: Path | None = None) -> tuple[Any, dict[str, Any]]:
-    from public_nerfacto_config_v1 import build_public_nerfacto_config
+    from public_nerfacto_config_v1 import build_public_nerfacto_config, install_rdna4_portable_mlp_policy
     cfg = copy.deepcopy(build_public_nerfacto_config())
+    portable_mlp_policy = install_rdna4_portable_mlp_policy()
+    if portable_mlp_policy.get("effective_otype") != "PortableMLP":
+        raise RuntimeError("public Nerfacto config did not select PortableMLP")
+    if portable_mlp_policy.get("fail_closed_unknown_otype") is not True:
+        raise RuntimeError("public PortableMLP policy is not fail closed")
     cfg.data = data
     cfg.output_dir = output_dir
     cfg.experiment_name = run_name
@@ -524,6 +529,7 @@ def configure_trainer(data: Path, output_dir: Path, run_name: str, seed: int, ra
         "prefetch_factor": getattr(dm, "prefetch_factor", None),
         "loader_policy": "PUBLIC_SINGLE_WORKER_FAIL_CLOSED",
         "model_implementation": getattr(cfg.pipeline.model, "implementation", None),
+        "portable_mlp_policy": portable_mlp_policy,
         "load_checkpoint": str(checkpoint) if checkpoint else None,
     }
     return cfg, summary

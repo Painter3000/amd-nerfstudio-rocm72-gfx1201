@@ -157,8 +157,80 @@ def install_viewer_free_import_quarantine() -> dict[str, Any]:
     }
 
 
+PORTABLE_MLP_POLICY_MARKER = "amd_nerfstudio_public_portable_mlp_policy_v1"
+PORTABLE_MLP_OTYPE = "PortableMLP"
+PORTABLE_MLP_SOURCE_OTYPES = frozenset({"FullyFusedMLP", "CutlassMLP", "PortableMLP"})
+
+
+def install_rdna4_portable_mlp_policy() -> dict[str, Any]:
+    """Rewrite Nerfstudio TCNN MLP configs to the qualified AMD backend.
+
+    The pinned Nerfstudio revision emits ``FullyFusedMLP`` for the layer widths
+    used by Nerfacto.  The qualified tiny-rdna4-nn portable runtime deliberately
+    rejects that CUDA-specific backend and accepts ``PortableMLP`` instead.
+    This scoped policy keeps Nerfstudio and tiny-rdna4-nn source trees pristine
+    while changing only the configuration dictionary supplied at construction.
+    """
+
+    from nerfstudio.field_components.mlp import MLP
+
+    existing = getattr(MLP, PORTABLE_MLP_POLICY_MARKER, None)
+    if existing is not None:
+        if not isinstance(existing, dict):
+            raise RuntimeError("portable MLP policy marker has invalid type")
+        if existing.get("effective_otype") != PORTABLE_MLP_OTYPE:
+            raise RuntimeError("portable MLP policy marker has invalid effective backend")
+        if existing.get("fail_closed_unknown_otype") is not True:
+            raise RuntimeError("portable MLP policy marker is not fail closed")
+        return dict(existing)
+
+    original = MLP.get_tcnn_network_config
+    if not callable(original):
+        raise RuntimeError("pinned Nerfstudio MLP config factory is not callable")
+
+    def portable_get_tcnn_network_config(
+        cls: type,
+        activation: Any,
+        out_activation: Any,
+        layer_width: int,
+        num_layers: int,
+    ) -> dict[str, Any]:
+        del cls
+        config = original(
+            activation=activation,
+            out_activation=out_activation,
+            layer_width=layer_width,
+            num_layers=num_layers,
+        )
+        if not isinstance(config, dict):
+            raise RuntimeError("pinned Nerfstudio MLP config factory returned a non-dict")
+        source_otype = config.get("otype")
+        if source_otype not in PORTABLE_MLP_SOURCE_OTYPES:
+            raise RuntimeError(
+                "unsupported TCNN MLP backend in public RDNA4 scope: "
+                f"{source_otype!r}"
+            )
+        rewritten = dict(config)
+        rewritten["otype"] = PORTABLE_MLP_OTYPE
+        return rewritten
+
+    MLP.get_tcnn_network_config = classmethod(portable_get_tcnn_network_config)
+    policy = {
+        "policy": "RDNA4_PORTABLE_MLP_CONFIG_REWRITE",
+        "scope": "NERFACTO_TCNN_MLP_CONFIG_ONLY",
+        "source_otypes": sorted(PORTABLE_MLP_SOURCE_OTYPES),
+        "effective_otype": PORTABLE_MLP_OTYPE,
+        "native_runtime_modified": False,
+        "nerfstudio_source_modified": False,
+        "fail_closed_unknown_otype": True,
+    }
+    setattr(MLP, PORTABLE_MLP_POLICY_MARKER, dict(policy))
+    return dict(policy)
+
+
 def build_public_nerfacto_config() -> Any:
     install_viewer_free_import_quarantine()
+    portable_mlp_policy = install_rdna4_portable_mlp_policy()
 
     from nerfstudio.cameras.camera_optimizers import CameraOptimizerConfig
     from nerfstudio.configs.base_config import ViewerConfig
@@ -170,7 +242,7 @@ def build_public_nerfacto_config() -> Any:
     from nerfstudio.models.nerfacto import NerfactoModelConfig
     from nerfstudio.pipelines.base_pipeline import VanillaPipelineConfig
 
-    return TrainerConfig(
+    cfg = TrainerConfig(
         method_name="nerfacto",
         steps_per_eval_batch=500,
         steps_per_save=2000,
@@ -205,6 +277,8 @@ def build_public_nerfacto_config() -> Any:
         viewer=ViewerConfig(num_rays_per_chunk=1 << 15),
         vis="tensorboard",
     )
+    setattr(cfg, "amd_rdna4_portable_mlp_policy", portable_mlp_policy)
+    return cfg
 
 
 def self_test() -> int:
